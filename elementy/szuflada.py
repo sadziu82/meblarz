@@ -60,7 +60,7 @@ _SLIDES_DB: dict | None = None
 def _load_slides_db() -> dict:
     global _SLIDES_DB
     if _SLIDES_DB is None:
-        db_path = Path(__file__).parent / 'prowadnice.yaml'
+        db_path = Path(__file__).parent.parent / 'baza' / 'prowadnice.yaml'
         with open(db_path) as f:
             _SLIDES_DB = yaml.safe_load(f)['prowadnice']
     return _SLIDES_DB

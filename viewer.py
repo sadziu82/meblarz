@@ -21,7 +21,7 @@ from PyQt6.QtGui import QSurfaceFormat
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
-from drawer_model import DrawerModel, Board, Hole, JointHole, load_drawer
+from elementy.szuflada import DrawerModel, Board, Hole, JointHole, load_drawer
 
 
 def _ray_aabb(ro, rd, bmin, bmax):
@@ -602,7 +602,7 @@ def main():
 
     yaml_path = sys.argv[1] if len(sys.argv) > 1 else None
     if yaml_path is None:
-        default = Path(__file__).parent / 'szuflada.yaml'
+        default = Path(__file__).parent / 'projekty' / 'szuflada.yaml'
         if default.exists():
             yaml_path = str(default)
 
