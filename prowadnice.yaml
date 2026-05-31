@@ -1,0 +1,74 @@
+# Baza danych prowadnic szuflad
+# Referencja do konkretnego modelu w yaml szuflady: slides.model: <id>
+
+prowadnice:
+
+  # ── GTV Prowadnica kulkowa H53 ──────────────────────────────────────────────
+  # Źródło: Karta_produktowa_PL-EN-RU__2021_65.pdf
+  # Zastosowanie: szuflady głębokie (>600mm), obciążenie do 100kg
+  GTV-H53:
+    nazwa: "GTV Prowadnica kulkowa H53"
+    producent: GTV
+    symbol: PK-0-H53
+    wysokosc_mm: 53           # H – wysokość prowadnicy
+    luz_boczny_mm: 19.5       # z każdej strony; SKW = LW − 2×19.5
+    nosnosc_kg: 100
+    wysuw: pelny              # FULL NL – pełny wysuw
+    luz_tylny_mm: 20          # standardowy luz za skrzynką
+    dostepne_dlugosci_mm:     # NL co 50mm, zakres 300–1100
+      - 300
+      - 350
+      - 400
+      - 450
+      - 500
+      - 550
+      - 600
+      - 650
+      - 700
+      - 750
+      - 800
+      - 850
+      - 900
+      - 950
+      - 1000
+      - 1050
+      - 1100
+    # Szuflada wewnętrzna (inner drawer): SKL = NL
+    # Głębokość skrzynki = NL prowadnicy
+    montaz_szuflada_wewnetrzna:
+      # Pozycje otworów montażowych na boku KORPUSU (od krawędzi szafki do przodu)
+      # Pierwsza pozycja: 35mm od krawędzi, potem wg schematu odstępów
+      # Schemat odstępów (mm): 128, 96, 96, 96, 96, 64, 96, 96, 96, 96, 96, ...
+      # Otwory używane wg NL – generowane dynamicznie w kodzie
+      pierwszy_otwor_od_krawedzi_mm: 35
+      schemat_odstepow_mm: [128, 96, 96, 96, 96, 64, 96, 96, 96, 96, 96, 96, 96]
+      srednica_otworow_korpus_mm: 5.8   # ø5,8 – otwory na boku korpusu
+      srednica_otworow_skrzynka_mm: 5.6 # ø5,6 – otwory na boku skrzynki
+      glebokos_otworow_mm: 3
+
+  # ── GTV Prowadnica kulkowa H45 (standardowa, lekka) ─────────────────────────
+  # Placeholder – uzupełnić kartą produktową
+  GTV-H45:
+    nazwa: "GTV Prowadnica kulkowa H45"
+    producent: GTV
+    symbol: PK-0-H45
+    wysokosc_mm: 45
+    luz_boczny_mm: 12.5       # standardowa kulkowa boczna
+    nosnosc_kg: 45
+    wysuw: pelny
+    luz_tylny_mm: 20
+    dostepne_dlugosci_mm:
+      - 250
+      - 300
+      - 350
+      - 400
+      - 450
+      - 500
+      - 550
+      - 600
+    montaz_szuflada_wewnetrzna:
+      pierwszy_otwor_od_krawedzi_mm: 37
+      schemat_odstepow_mm: [96, 96, 96, 96, 96, 96]
+      srednica_otworow_korpus_mm: 5.0
+      srednica_otworow_skrzynka_mm: 5.0
+      glebokos_otworow_mm: 3
