@@ -712,11 +712,20 @@ class MainWindow(QMainWindow):
     def _update_info(self):
         if self._dims_level == 0 or not self.gl.model:
             self._info.hide(); return
-        sel = self.gl._selected
+        model = self.gl.model
+        sel   = self.gl._selected
+
+        lines = []
+        if model.slide_model:
+            lines.append(f"  Slide: {model.slide_model}   NL = {model.slide_nl} mm")
+            lines.append("")
+
         if sel is None:
-            self._info.setText("  (click a board to see dimensions)")
+            lines.append("  (click a board to see dimensions)")
         else:
-            self._info.setText(_board_info_text(self.gl.model.boards[sel], self._dims_level))
+            lines.append(_board_info_text(model.boards[sel], self._dims_level))
+
+        self._info.setText("\n".join(lines))
         self._reposition_info()
         self._info.show()
 
