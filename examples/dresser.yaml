@@ -22,6 +22,13 @@ carcass:
     #   builtin_right  — right side against wall → dowels on left, confirmats on right
     #   builtin_both   — both sides against walls → confirmats on both sides
 
+  # top_split:              # [default: omit = single full-depth top panel]
+  #   front: 200            # (required) depth of front top section [mm]
+  #   rear:  150            # (required) depth of rear top section [mm]
+  #                         # gap = carcass.depth − front − rear (must be ≥ 0)
+  #                         # When set, creates carcass_top_front and carcass_top_rear
+  #                         # with an open section between them.
+
 # ── Material thicknesses ──────────────────────────────────────────────────────
 material:
   thickness:        18   # (required) MDF — carcass top, bottom, sides [mm] (rule 2)

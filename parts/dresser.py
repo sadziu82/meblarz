@@ -217,14 +217,41 @@ def load_dresser(path: str) -> DrawerModel:
         all_boards.extend(plinth_boards)
 
     # ─ Carcass ────────────────────────────────────────────────────────────────
+    top_split = cfg['carcass'].get('top_split', None)
+    if top_split is not None:
+        ts_front = top_split['front']
+        ts_rear  = top_split['rear']
+        ts_gap   = carcass_d - ts_front - ts_rear
+        if ts_gap < 0:
+            raise ValueError(
+                f"carcass.top_split.front ({ts_front}mm) + rear ({ts_rear}mm) "
+                f"exceeds carcass.depth ({carcass_d}mm)"
+            )
+
     carcass_btm = Board('carcass_bottom',
                         width=carcass_w, height=thick, depth=carcass_d,
                         pos=(0, 0, z_plinth_top),
                         color=_C_CARCASS, movable=False)
-    carcass_top = Board('carcass_top',
-                        width=carcass_w, height=thick, depth=carcass_d,
-                        pos=(0, 0, carcass_h - thick),
-                        color=_C_CARCASS, movable=False)
+
+    if top_split is None:
+        _top = Board('carcass_top',
+                     width=carcass_w, height=thick, depth=carcass_d,
+                     pos=(0, 0, carcass_h - thick),
+                     color=_C_CARCASS, movable=False)
+        top_boards    = [_top]
+        top_sections  = [(_top, 0, carcass_d)]  # (board, y_start, section_depth)
+    else:
+        _top_f = Board('carcass_top_front',
+                       width=carcass_w, height=thick, depth=ts_front,
+                       pos=(0, 0, carcass_h - thick),
+                       color=_C_CARCASS, movable=False)
+        _top_r = Board('carcass_top_rear',
+                       width=carcass_w, height=thick, depth=ts_rear,
+                       pos=(0, carcass_d - ts_rear, carcass_h - thick),
+                       color=_C_CARCASS, movable=False)
+        top_boards   = [_top_f, _top_r]
+        top_sections = [(_top_f, 0, ts_front), (_top_r, carcass_d - ts_rear, ts_rear)]
+
     side_l = Board('carcass_left_side',
                    width=thick, height=interior_H, depth=carcass_d,
                    pos=(0, 0, z_int_bottom),
@@ -234,7 +261,7 @@ def load_dresser(path: str) -> DrawerModel:
                    pos=(carcass_w - thick, 0, z_int_bottom),
                    color=_C_CARCASS, movable=False)
 
-    carcass_boards = [carcass_btm, carcass_top, side_l, side_r]
+    carcass_boards = [carcass_btm] + top_boards + [side_l, side_r]
 
     # ─ Rails ─────────────────────────────────────────────────────────────────
     rail_boards = []
@@ -247,39 +274,36 @@ def load_dresser(path: str) -> DrawerModel:
         ))
 
     # ─ Carcass joints ─────────────────────────────────────────────────────────
-    y_pos = _carcass_joint_positions(carcass_d)
+    x_lc = thick / 2
+    x_rc = carcass_w - thick / 2
+    z_top_bottom = carcass_h - thick
+    z_btm_top    = z_plinth_top + thick
 
-    x_left_center  = thick / 2
-    x_right_center = carcass_w - thick / 2
+    jt_l   = joint_type('left')
+    jt_r   = joint_type('right')
+    # dowel: top drilled from below (-z), bottom from above (+z)
+    # confirmat: top from above (+z), bottom from below (-z)
+    w_dir_l = '-z' if jt_l == 'dowel' else '+z'
+    s_dir_l = '+z' if jt_l == 'dowel' else '-z'
+    w_dir_r = '-z' if jt_r == 'dowel' else '+z'
+    s_dir_r = '+z' if jt_r == 'dowel' else '-z'
 
-    z_top_bottom  = carcass_h - thick
-    z_btm_top     = z_plinth_top + thick
+    # Bottom: always spans full carcass depth
+    for yp in _carcass_joint_positions(carcass_d):
+        carcass_btm.joint_holes.append(JH(x_lc, yp, z_btm_top, s_dir_l, 1, 'carcass_left_side',  jt_l))
+        side_l.joint_holes.append(     JH(x_lc, yp, z_btm_top, '-z',    2, 'carcass_bottom',     jt_l))
+        carcass_btm.joint_holes.append(JH(x_rc, yp, z_btm_top, s_dir_r, 1, 'carcass_right_side', jt_r))
+        side_r.joint_holes.append(     JH(x_rc, yp, z_btm_top, '-z',    2, 'carcass_bottom',     jt_r))
+    all_joints += [('carcass_bottom', 'carcass_left_side'), ('carcass_bottom', 'carcass_right_side')]
 
-    for yp in y_pos:
-        jt_l = joint_type('left')
-        # dowel: element 1 drilled inward (top from below '-z', bottom from above '+z')
-        # confirmat: element 1 drilled from outer face (top from above '+z', bottom from below '-z')
-        w_dir = '-z' if jt_l == 'dowel' else '+z'
-        s_dir = '+z' if jt_l == 'dowel' else '-z'
-        carcass_top.joint_holes.append(JH(x_left_center, yp, z_top_bottom,  w_dir, 1, 'carcass_left_side',  jt_l))
-        side_l.joint_holes.append(     JH(x_left_center, yp, z_top_bottom,  '+z',  2, 'carcass_top',        jt_l))
-        carcass_btm.joint_holes.append(JH(x_left_center, yp, z_btm_top,     s_dir, 1, 'carcass_left_side',  jt_l))
-        side_l.joint_holes.append(     JH(x_left_center, yp, z_btm_top,     '-z',  2, 'carcass_bottom',     jt_l))
-
-        jt_r = joint_type('right')
-        w_dir = '-z' if jt_r == 'dowel' else '+z'
-        s_dir = '+z' if jt_r == 'dowel' else '-z'
-        carcass_top.joint_holes.append(JH(x_right_center, yp, z_top_bottom, w_dir, 1, 'carcass_right_side', jt_r))
-        side_r.joint_holes.append(     JH(x_right_center, yp, z_top_bottom, '+z',  2, 'carcass_top',        jt_r))
-        carcass_btm.joint_holes.append(JH(x_right_center, yp, z_btm_top,    s_dir, 1, 'carcass_right_side', jt_r))
-        side_r.joint_holes.append(     JH(x_right_center, yp, z_btm_top,    '-z',  2, 'carcass_bottom',     jt_r))
-
-    all_joints += [
-        ('carcass_top',    'carcass_left_side'),
-        ('carcass_top',    'carcass_right_side'),
-        ('carcass_bottom', 'carcass_left_side'),
-        ('carcass_bottom', 'carcass_right_side'),
-    ]
+    # Top: one section or two (front + rear) when top_split is set
+    for top_board, y_start, section_depth in top_sections:
+        for yp in _joint_positions(y_start, section_depth):
+            top_board.joint_holes.append(JH(x_lc, yp, z_top_bottom, w_dir_l, 1, 'carcass_left_side',  jt_l))
+            side_l.joint_holes.append(   JH(x_lc, yp, z_top_bottom, '+z',    2, top_board.name,       jt_l))
+            top_board.joint_holes.append(JH(x_rc, yp, z_top_bottom, w_dir_r, 1, 'carcass_right_side', jt_r))
+            side_r.joint_holes.append(   JH(x_rc, yp, z_top_bottom, '+z',    2, top_board.name,       jt_r))
+        all_joints += [(top_board.name, 'carcass_left_side'), (top_board.name, 'carcass_right_side')]
 
     # ─ Rail joints ────────────────────────────────────────────────────────────
     r_y_pos = _rail_joint_positions(r_depth)
