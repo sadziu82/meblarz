@@ -121,7 +121,8 @@ def load_dresser(path: str) -> DrawerModel:
     distrib     = cfg['drawers'].get('distribution', 'equal')
     height_mode = _parse_height_mode(cfg['drawers'].get('height_mode', 'front'))
 
-    slide_id = cfg['slides']['model']
+    slide_id  = cfg['slides']['model']
+    target_nl = cfg['slides'].get('nl', None)
     db = _load_slides_db()
     if slide_id not in db:
         raise ValueError(f"Unknown slide model: '{slide_id}'. Available: {list(db)}")
@@ -316,6 +317,7 @@ def load_dresser(path: str) -> DrawerModel:
             inset=inset,
             side_gap=side_gap,
             bot_gap=bot_gap,
+            target_nl=target_nl,
         )
         nl_used = nl
 

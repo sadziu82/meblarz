@@ -1,4 +1,4 @@
-# Baza wiedzy - zasady projektowania mebli
+# Baza wiedzy — zasady projektowania mebli
 
 ## MATERIAŁY I WYMIARY
 
@@ -25,76 +25,103 @@
 14. Głębokość skrzynki: `box_depth = głębokość_wnęki − (front_inset + grubość_frontu) − luz_tylny`. *(Uwaga: odejmujemy pełną grubość frontu wraz z cofnięciem, bo skrzynka zaczyna się za tylną ścianą frontu — zasada 10.)*
 15. Tył skrzynki szuflady ma pełną szerokość zewnętrzną `box_W_ext` (taką samą jak dno). Leży na dnie przy tylnej krawędzi skrzynki.
 16. Boki skrzynki mają głębokość `box_depth − mdf` — skrócone o grubość tylnej ścianki. Boki mieszczą się między tylną ścianą frontu a tylną ścianką (nie wychodzą poza tył).
-17. Głębokość skrzynki = NL prowadnicy (dla szuflady wewnętrznej: SKL = NL). Wybierać największe dostępne NL nieprzekraczające `max_box_depth`. Długość prowadnicy wyznacza głębokość skrzynki, nie odwrotnie.
+17. Głębokość skrzynki = NL prowadnicy (dla szuflady wewnętrznej: SKL = NL). Wybierać **największe dostępne NL** nieprzekraczające `max_box_depth`. Długość prowadnicy wyznacza głębokość skrzynki, nie odwrotnie.
+18. Głębokość skrzynki można wymusić jawnie, podając `slides.nl` w YAML-u szuflady lub komody. Podane NL musi istnieć na liście `available_lengths_mm` danego modelu i mieścić się w `max_box_depth`. Jeśli `slides.nl` nie jest podane, program automatycznie dobiera maksymalne dostępne NL (zasada 17).
 
 ---
 
 ## POŁĄCZENIA SKRZYNKI SZUFLADY WEWNĘTRZNEJ
 
-18. Połączenia skrzynki — przegląd typów:
-    - Front (widoczny) ↔ boki, front ↔ dno: **kołki drewniane** (zasada 26, estetyka).
+19. Połączenia skrzynki — przegląd typów:
+    - Front (widoczny) ↔ boki, front ↔ dno: **kołki drewniane** (zasada 29, estetyka).
     - Dno ↔ boki, dno ↔ tył, tył ↔ boki: **konfirmaty** (powierzchnie niewidoczne).
-19. **Dno ↔ Bok lewy / Bok prawy**: konfirmaty wiercone od spodu dna w kierunku +Z przez dno i w podstawę boku. Pozycje Y: wg zasady 1/4 i 3/4 głębokości boku (`box_depth − mdf`). Pozycja X: środek grubości boku.
-20. **Tył ↔ Bok lewy / Bok prawy**: konfirmaty wiercone od tylnej ściany tyłu w kierunku −Y przez tył w tylną krawędź boku. Pozycje Z: wg zasady 1/4 i 3/4 wysokości boku (`side_H`). Pozycja X: środek grubości boku.
-21. **Dno ↔ Tył**: konfirmaty wiercone od spodu dna w kierunku +Z przez dno w podstawę tylnej ścianki. Pozycje X: wg zasady 1/4 i 3/4 szerokości zewnętrznej (`box_W_ext`). Pozycja Y: środek głębokości tylnej ścianki.
-22. **Front ↔ Bok lewy / Bok prawy**: kołki ø8mm. Otwory w tylnej ścianie frontu (w płaszczyźnie, głębokość 11mm) i w czole boku (głębokość 27mm). Pozycje Z: 1/4 i 3/4 wysokości boku (`side_H`), liczone od podstawy boku. Pozycja X: środek grubości boku.
-23. **Front ↔ Dno**: **zawsze dwa kołki** ø8mm przy tym typie szuflady. Otwory w tylnej ścianie frontu (w płaszczyźnie, głębokość 11mm) i w czole dna — przednia krawędź (głębokość 27mm). Pozycje X: 1/4 i 3/4 szerokości zewnętrznej dna (`box_W_ext`). Pozycja Z: środek grubości dna.
+20. **Dno ↔ Bok lewy / Bok prawy**: konfirmaty wiercone od spodu dna w kierunku +Z przez dno i w podstawę boku. Pozycje Y: wg zasady 1/4 i 3/4 głębokości boku (`box_depth − mdf`). Pozycja X: środek grubości boku.
+21. **Tył ↔ Bok lewy / Bok prawy**: konfirmaty wiercone od tylnej ściany tyłu w kierunku −Y przez tył w tylną krawędź boku. Pozycje Z: wg zasady 1/4 i 3/4 wysokości boku (`side_H`). Pozycja X: środek grubości boku.
+22. **Dno ↔ Tył**: konfirmaty wiercone od spodu dna w kierunku +Z przez dno w podstawę tylnej ścianki. Pozycje X: wg zasady 1/4 i 3/4 szerokości zewnętrznej (`box_W_ext`). Pozycja Y: środek głębokości tylnej ścianki.
+23. **Front ↔ Bok lewy / Bok prawy**: kołki ø8mm. Otwory w tylnej ścianie frontu (w płaszczyźnie, głębokość 11mm) i w czole boku (głębokość 27mm). Pozycje Z: 1/4 i 3/4 wysokości boku (`side_H`), liczone od podstawy boku. Pozycja X: środek grubości boku.
+24. **Front ↔ Dno**: **zawsze dwa kołki** ø8mm przy tym typie szuflady. Otwory w tylnej ścianie frontu (w płaszczyźnie, głębokość 11mm) i w czole dna — przednia krawędź (głębokość 27mm). Pozycje X: 1/4 i 3/4 szerokości zewnętrznej dna (`box_W_ext`). Pozycja Z: środek grubości dna.
 
 ---
 
 ## PROWADNICE
 
-24. Zawsze pytać o model/specyfikację prowadnic — grubość i montaż są różne. Nie zakładać z góry.
-25. Standardowe boczne kulkowe: ~12,5mm z każdej strony. Przy głębokich/ciężkich szufladach mogą być grubsze.
-26. Dla wnęk głębszych niż **600mm** stosować prowadnice wzmocnione (np. GTV H53: luz 19,5mm, nośność 100kg, NL 300–1100mm). Standardowe prowadnice (H45 i podobne) nie są przystosowane do takich głębokości.
-27. Modele prowadnic przechowywane są w `prowadnice.yaml`. W pliku YAML szuflady podawać `slides.model: <ID>` (np. `GTV-H53`) — program automatycznie dobierze NL i wymiary montażowe.
-28. Luz tylny szuflady (prowadnica nie wystaje poza korpus): domyślnie **20mm**.
-29. Wysokość montażu prowadnicy: spód prowadnicy na **50mm od spodu dna szuflady**. Na podstawie modelu prowadnicy (wymiar H) wyliczyć dokładną wysokość osi otworów montażowych — zarówno na skrzynce szuflady, jak i na boku korpusu.
-30. Otwory montażowe prowadnic: wymiary i rozstaw wg karty produktowej modelu prowadnicy — używać danych z `prowadnice.yaml`.
-31. Rozmieszczenie otworów montażowych na korpusie dopasować do typu szuflady (standard, push-to-open, soft-close itp.) — sprawdzać w dokumentacji prowadnicy, gdzie producent podaje pozycje względem frontu i tyłu szuflady.
+25. Zawsze pytać o model/specyfikację prowadnic — grubość i montaż są różne. Nie zakładać z góry.
+26. Standardowe boczne kulkowe: ~12,5mm z każdej strony. Przy głębokich/ciężkich szufladach mogą być grubsze.
+27. Dla wnęk głębszych niż **600mm** stosować prowadnice wzmocnione (np. GTV H53: luz 19,5mm, nośność 100kg, NL 300–1100mm). Standardowe prowadnice (H45 i podobne) nie są przystosowane do takich głębokości.
+28. Modele prowadnic przechowywane są w `db/slides.yaml`. W pliku YAML szuflady podawać `slides.model: <ID>` (np. `GTV-H53`) — program automatycznie dobierze NL i wymiary montażowe. Opcjonalnie `slides.nl: <NL>` wymusza konkretną długość (zasada 18).
+29. Luz tylny szuflady (prowadnica nie wystaje poza korpus): domyślnie **20mm**.
+30. Wysokość montażu prowadnicy: spód prowadnicy na **50mm od spodu dna szuflady**. Na podstawie modelu prowadnicy (wymiar H) wyliczyć dokładną wysokość osi otworów montażowych — zarówno na skrzynce szuflady, jak i na boku korpusu.
+31. Otwory montażowe prowadnic: wymiary i rozstaw wg karty produktowej modelu prowadnicy — używać danych z `db/slides.yaml`.
+32. Rozmieszczenie otworów montażowych na korpusie dopasować do typu szuflady (standard, push-to-open, soft-close itp.) — sprawdzać w dokumentacji prowadnicy, gdzie producent podaje pozycje względem frontu i tyłu szuflady.
 
 ---
 
-## ŁĄCZENIA - ZASADY OGÓLNE
+## ŁĄCZENIA — ZASADY OGÓLNE
 
-32. Każde połączenie musi mieć **co najmniej dwa punkty** mocowania (dwa konfirmaty lub dwa kołki).
-33. Dobór metody łączenia:
+33. Każde połączenie musi mieć **co najmniej dwa punkty** mocowania (dwa konfirmaty lub dwa kołki).
+34. Dobór metody łączenia:
     - Powierzchnie **niewidoczne** → konfirmaty.
     - Powierzchnie **widoczne** → kołki drewniane.
     - Powierzchnie **widoczne z potrzebą wzmocnienia** → pytać klienta (kołki + wkręty od wewnątrz, kątowniki, lamel itp.).
 
 ---
 
-## ŁĄCZENIA - KONFIRMATY
+## ŁĄCZENIA — KONFIRMATY
 
-34. Konfirmaty — zawsze pogłębienie na głowicę:
+35. Konfirmaty — zawsze pogłębienie na głowicę:
     - Otwór przelotowy: **ø5mm** lub **ø4mm**
     - Pogłębienie na głowicę: **ø11mm × 4,5mm głębokości**
     - Otwór gwintowany w drugim elemencie: **ø5mm** lub **ø4mm**, min. 35mm głębokości
-35. Głębokość otworu gwintowanego = długość konfirmatu − grubość pierwszego elementu, minimum **35mm**. Dla konfirmatu 50mm i MDF 18mm = 32mm → zaokrąglamy do 35mm.
-36. Rozmieszczenie konfirmatów — w **1/4 i 3/4** długości łączonej krawędzi, max 100mm od końca. Jeśli odstęp między konfirmatami > 300mm — dodać kolejne w równych odstępach.
+36. Głębokość otworu gwintowanego = długość konfirmatu − grubość pierwszego elementu, minimum **35mm**. Dla konfirmatu 50mm i MDF 18mm = 32mm → zaokrąglamy do 35mm.
+37. Rozmieszczenie konfirmatów — w **1/4 i 3/4** długości łączonej krawędzi, max 100mm od końca. Jeśli odstęp między konfirmatami > 300mm — dodać kolejne w równych odstępach.
 
 ---
 
-## ŁĄCZENIA - KOŁKI DREWNIANE
+## ŁĄCZENIA — KOŁKI DREWNIANE
 
-37. Kołki drewniane: **ø8mm × 35mm** jako standard.
-38. Głębokość otworów na kołki:
+38. Kołki drewniane: **ø8mm × 35mm** jako standard.
+39. Głębokość otworów na kołki:
     - W **płaszczyźnie** elementu: **11mm**
     - W **czole** elementu: **27mm**
-39. Rozmieszczenie kołków — tak samo jak konfirmaty: **1/4 i 3/4** wspólnego wymiaru łączonych elementów, max 100mm od końca.
-40. Przy otworach łączących dwa elementy — pozycja 1/4 i 3/4 liczona z **wspólnego wymiaru** (krótszy z dwóch).
+40. Rozmieszczenie kołków — tak samo jak konfirmaty: **1/4 i 3/4** wspólnego wymiaru łączonych elementów, max 100mm od końca.
+41. Przy otworach łączących dwa elementy — pozycja 1/4 i 3/4 liczona z **wspólnego wymiaru** (krótszy z dwóch).
 
 ---
 
 ## LOKALNY UKŁAD WSPÓŁRZĘDNYCH PŁYTY
 
-41. Pozycje otworów zawsze podawane w **lokalnym układzie współrzędnych** płyty, niezależnie od orientacji elementu w meblu:
+42. Pozycje otworów zawsze podawane w **lokalnym układzie współrzędnych** płyty, niezależnie od orientacji elementu w meblu:
     - **x** — oś pozioma (wzdłuż szerokości płyty)
     - **y** — oś pionowa (wzdłuż wysokości płyty)
     - **głębokość** — zawsze grubość płyty; nie wpływa na położenie otworu w płaszczyźnie i nie jest podawana jako osobna współrzędna pozycji
-42. Otwory **w czole** (kołki, gwint konfirmatu wchodzący od czoła) leżą zawsze na środku grubości płyty. Pozycja podawana wyłącznie jako (x, y).
-43. Otwór w płaszczyźnie — pozycja jako (x, y) od lewego dolnego narożnika widocznej twarzy płyty.
+43. Otwory **w czole** (kołki, gwint konfirmatu wchodzący od czoła) leżą zawsze na środku grubości płyty. Pozycja podawana wyłącznie jako (x, y).
+44. Otwór w płaszczyźnie — pozycja jako (x, y) od lewego dolnego narożnika widocznej twarzy płyty.
+
+---
+
+## ESTETYKA
+
+45. Elementy widoczne (fronty, boki zewnętrzne) — **nigdy** nie mają widocznych wierceń od strony zewnętrznej. Otwory tylko od strony wewnętrznej/niewidocznej.
+46. Front szuflady: otwory na kołki wyłącznie od strony skrzynki (tył frontu), wiercone w płaszczyźnie.
+
+---
+
+## OPENSCAD
+
+47. Tylko **ASCII** w nazwach zmiennych i modułów. Polskie znaki tylko w komentarzach (`//`).
+48. Elementy estetyczne (fronty) modelować jako **osobne moduły** — nie zagnieżdżać w module skrzynki.
+49. Przed pisaniem kodu narysować przekrój — określić który element jest bazowy, które stoją na nim, które obejmują.
+50. Przy otworach łączących dwa elementy na różnych wysokościach Z — liczyć pozycję we **współrzędnych globalnych** (dodać offset między elementami).
+51. Kierunki rotacji cylindrów (domyślnie idą w `+Z`):
+    - wiercenie w `+Y`: `rotate([-90,0,0])`
+    - wiercenie w `-Y`: `rotate([90,0,0])`
+    - wiercenie w `-Z`: `rotate([180,0,0])`
+    - wiercenie w `+Z`: brak rotacji
+52. Otwory wiercone od powierzchni w głąb — cylinder startuje na powierzchni + **0.1mm** naddatku (żeby difference działał poprawnie).
+53. Dwa moduły dla otworów konfirmatów:
+    - `conf_hole()` — **pierwszy element**: pogłębienie ø11mm + otwór przelotowy ø5mm
+    - `conf_hole_thread()` — **drugi element**: tylko otwór gwintowany ø5mm, głębokość 35mm
+54. Exploded view — każdy element odsunięty w naturalnym kierunku montażu (front w -Y, boki w ±X, tył w +Y, dno w -Z). Parametr `explode = 0/1` do przełączania.
 
 ---
 
@@ -102,27 +129,27 @@
 
 ### Konstrukcja i wymiary
 
-54. Klient podaje wymiary zewnętrzne mebla. **`carcass.height` to całkowita wysokość od podłogi do wierzchu, wliczając cokoł.** Wierzch i spód mają pełną szerokość zewnętrzną (`width`). Boki mieszczą się między nimi. Wymiary wewnętrzne: `int_W = width − 2×thickness`, `int_H = (height − plinth.height) − 2×thickness`, `int_D = depth`.
-55. Tył szafki z szufladami — **otwarty** (zasada 3). Nie stosować HDF przy szufladach.
-56. Typ szafki `placement` określa widoczność boków: `freestanding` — oba boki widoczne; `builtin_left/right` — jeden bok przy ścianie (niewidoczny); `builtin_both` — oba niewidoczne.
+55. Klient podaje wymiary zewnętrzne mebla. **`carcass.height` to całkowita wysokość od podłogi do wierzchu, wliczając cokoł.** Wierzch i spód mają pełną szerokość zewnętrzną (`width`). Boki mieszczą się między nimi. Wymiary wewnętrzne: `int_W = width − 2×thickness`, `int_H = (height − plinth.height) − 2×thickness`, `int_D = depth`.
+56. Tył szafki z szufladami — **otwarty** (zasada 3). Nie stosować HDF przy szufladach.
+57. Typ szafki `placement` określa widoczność boków: `freestanding` — oba boki widoczne; `builtin_left/right` — jeden bok przy ścianie (niewidoczny); `builtin_both` — oba niewidoczne.
 
 ### Połączenia korpusu
 
-57. Połączenia **wierzch ↔ boki** i **spód ↔ boki** — kierunek wiercenia zależy od typu połączenia:
+58. Połączenia **wierzch ↔ boki** i **spód ↔ boki** — kierunek wiercenia zależy od typu połączenia:
     - **Kołki** (bok widoczny): wierzch — otwór w płaszczyźnie od **spodniej ściany** (wewnątrz szafki); spód — otwór w płaszczyźnie od **górnej ściany** (wewnątrz szafki). Otwory w czołach boków naprzeciw.
     - **Konfirmaty** (bok niewidoczny): wierzch — głowica na **górnej ścianie** (przykryta blatem/zabudową), wiercenie z góry w dół przez wierzch w czoło boku; spód — głowica na **dolnej ścianie** (pod szafką), wiercenie z dołu w górę przez spód w czoło boku.
-58. Połączenia **poprzeczki ↔ boki** — kierunek wiercenia zależy od widoczności boku:
+59. Połączenia **poprzeczki ↔ boki** — kierunek wiercenia zależy od widoczności boku:
     - **Kołki** (bok widoczny): element 1 od **wewnętrznej** ściany boku (ukryta wewnątrz szafki), otwór w płaszczyźnie; element 2 — czoło poprzeczki.
     - **Konfirmaty** (bok niewidoczny): element 1 od **zewnętrznej** ściany boku (przy ścianie budynku, niewidoczna), wiercenie przez bok w czoło poprzeczki; element 2 — czoło poprzeczki.
-59. Szafka kuchenna dolna (bez wierzchu, z poprzeczkami nośnymi) — osobny typ, osobne zasady.
+60. Szafka kuchenna dolna (bez wierzchu, z poprzeczkami nośnymi) — osobny typ, osobne zasady.
 
 ### Podział wysokości — szuflady z poprzeczkami
 
-60. Liczba poprzeczek między szufladami = `count − 1`. Każda poprzeczka ma szerokość `int_W` i głębokość wg specyfikacji (domyślnie 100mm).
-61. Sekwencja elementów od spodu do góry (dla każdej szuflady): `bottom_gap` (3mm) → front szuflady → `top_gap` (50mm, przerwa na palce) → poprzeczka (18mm) → … → front ostatniej szuflady → `top_gap` → spód wierzchu. Poprzeczka **nie** występuje po ostatniej (najwyższej) szufladzie.
-62. Wysokość frontu przy równym podziale (`distribution: equal`): `front_H = (int_H − (count−1)×rail_thickness − count×(top_gap + bottom_gap)) / count`. Wynik zaokrąglić w dół; nadmiarowe mm dodać do **najniższej** szuflady.
-63. Przy podziale niestandardowym (`distribution: custom`) — lista `heights` podana **od najniższej do najwyższej** szuflady. Można podać mniej wartości niż `count` — brakujące szuflady (najwyższe) wyliczane są jako równy podział pozostałej wysokości. Brakujące zawsze interpretowane jako `front_H`.
-64. Parametr `height_mode` (tylko przy `distribution: custom`) określa co oznaczają podane wysokości:
+61. Liczba poprzeczek między szufladami = `count − 1`. Każda poprzeczka ma szerokość `int_W` i głębokość wg specyfikacji (domyślnie 100mm).
+62. Sekwencja elementów od spodu do góry (dla każdej szuflady): `bottom_gap` (3mm) → front szuflady → `top_gap` (50mm, przerwa na palce) → poprzeczka (18mm) → … → front ostatniej szuflady → `top_gap` → spód wierzchu. Poprzeczka **nie** występuje po ostatniej (najwyższej) szufladzie.
+63. Wysokość frontu przy równym podziale (`distribution: equal`): `front_H = (int_H − (count−1)×rail_thickness − count×(top_gap + bottom_gap)) / count`. Wynik zaokrąglić w dół; nadmiarowe mm dodać do **najniższej** szuflady.
+64. Przy podziale niestandardowym (`distribution: custom`) — lista `heights` podana **od najniższej do najwyższej** szuflady. Można podać mniej wartości niż `count` — brakujące szuflady (najwyższe) wyliczane są jako równy podział pozostałej wysokości. Brakujące zawsze interpretowane jako `front_H`.
+65. Parametr `height_mode` (tylko przy `distribution: custom`) określa co oznaczają podane wysokości:
     - `front` (domyślnie) — wysokość frontu szuflady.
     - `niche` — wysokość wnęki: `front_H = h − top_gap − bottom_gap`.
     - `interior` — maksymalna wysokość zawartości (= `side_H`): `front_H = ⌊3h/2⌋` (minimalne front_H dające `side_H ≥ h`).
@@ -130,36 +157,10 @@
 
 ### Poprzeczka z rowkiem LED
 
-65. Rowek na taśmę LED frezowany na **spodniej ścianie** poprzeczki, 20mm od przedniej krawędzi, wymiary 12×4mm. Rowek oświetla otwartą szufladę poniżej.
-66. Poprzeczka nie sięga pełnej głębokości korpusu — za nią pozostaje wolna przestrzeń. Głębokość domyślna: 100mm.
+66. Rowek na taśmę LED frezowany na **spodniej ścianie** poprzeczki, 20mm od przedniej krawędzi, wymiary 12×4mm. Rowek oświetla otwartą szufladę poniżej.
+67. Poprzeczka nie sięga pełnej głębokości korpusu — za nią pozostaje wolna przestrzeń. Głębokość domyślna: 100mm.
 
 ### Cokoł
 
-67. Cokoł jest osobnym elementem montowanym pod spodem korpusu. `carcass.height` to całkowita wysokość mebla **wliczając cokoł** — wysokość korpusu bez cokołu = `height − plinth.height`. Parametry: `height` (domyślnie 100mm), `inset_front` (wcięcie od lica frontu, domyślnie 15mm), `inset_side` (wcięcie od boków, domyślnie 15mm). Wartość `height: 0` oznacza brak cokołu.
-68. Cokoł składa się z deski przedniej i dwóch desek bocznych (tył otwarty). Szerokość deski przedniej: `width − 2×inset_side`. Głębokość desek bocznych: `depth − inset_front − thickness`. *(Deski boczne zaczynają się za tylną ścianą deski przedniej.)* Połączenia: konfirmaty od zewnętrznej (dolnej) ściany cokołu — powierzchnia cokołu jest niewidoczna przy normalnym użytkowaniu.
-
----
-
-## ESTETYKA
-
-44. Elementy widoczne (fronty, boki zewnętrzne) — **nigdy** nie mają widocznych wierceń od strony zewnętrznej. Otwory tylko od strony wewnętrznej/niewidocznej.
-45. Front szuflady: otwory na kołki wyłącznie od strony skrzynki (tył frontu), wiercone w płaszczyźnie.
-
----
-
-## OPENSCAD
-
-46. Tylko **ASCII** w nazwach zmiennych i modułów. Polskie znaki tylko w komentarzach (`//`).
-47. Elementy estetyczne (fronty) modelować jako **osobne moduły** — nie zagnieżdżać w module skrzynki.
-48. Przed pisaniem kodu narysować przekrój — określić który element jest bazowy, które stoją na nim, które obejmują.
-49. Przy otworach łączących dwa elementy na różnych wysokościach Z — liczyć pozycję we **współrzędnych globalnych** (dodać offset między elementami).
-50. Kierunki rotacji cylindrów (domyślnie idą w `+Z`):
-    - wiercenie w `+Y`: `rotate([-90,0,0])`
-    - wiercenie w `-Y`: `rotate([90,0,0])`
-    - wiercenie w `-Z`: `rotate([180,0,0])`
-    - wiercenie w `+Z`: brak rotacji
-51. Otwory wiercone od powierzchni w głąb — cylinder startuje na powierzchni + **0.1mm** naddatku (żeby difference działał poprawnie).
-52. Dwa moduły dla otworów konfirmatów:
-    - `conf_hole()` — **pierwszy element**: pogłębienie ø11mm + otwór przelotowy ø5mm
-    - `conf_hole_thread()` — **drugi element**: tylko otwór gwintowany ø5mm, głębokość 35mm
-53. Exploded view — każdy element odsunięty w naturalnym kierunku montażu (front w -Y, boki w ±X, tył w +Y, dno w -Z). Parametr `explode = 0/1` do przełączania.
+68. Cokoł jest osobnym elementem montowanym pod spodem korpusu. `carcass.height` to całkowita wysokość mebla **wliczając cokoł** — wysokość korpusu bez cokołu = `height − plinth.height`. Parametry: `height` (domyślnie 100mm), `inset_front` (wcięcie od lica frontu, domyślnie 15mm), `inset_side` (wcięcie od boków, domyślnie 15mm). Wartość `height: 0` oznacza brak cokołu.
+69. Cokoł składa się z deski przedniej i dwóch desek bocznych (tył otwarty). Szerokość deski przedniej: `width − 2×inset_side`. Głębokość desek bocznych: `depth − inset_front − thickness`. *(Deski boczne zaczynają się za tylną ścianą deski przedniej.)* Połączenia: konfirmaty od zewnętrznej (dolnej) ściany cokołu — powierzchnia cokołu jest niewidoczna przy normalnym użytkowaniu.

@@ -1,0 +1,46 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# STANDALONE INNER DRAWER — complete configuration reference
+#
+# Usage: venv/bin/python viewer.py examples/drawer.yaml
+#
+# All rules referenced as (rule N) come from docs/design_rules.md.
+# Fields marked (required) must always be present.
+# Fields marked [default: X] are optional; the shown value is the default.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Niche dimensions ──────────────────────────────────────────────────────────
+# The client-provided opening into which the drawer is installed.
+niche:
+  width:  500    # (required) niche width [mm]
+  height: 200    # (required) niche height [mm]
+                 #   front_H = height − front.top_gap − front.bottom_gap
+  depth:  600    # (required) niche depth [mm]
+                 #   max_box_depth = depth − (front.inset + material.thickness) − slide.rear_clearance
+
+# ── Material thicknesses ──────────────────────────────────────────────────────
+material:
+  thickness:        18   # (required) MDF — front, sides, rear [mm] (rule 2)
+  bottom_thickness: 18   # (required) MDF — box bottom [mm] (rule 7)
+
+# ── Slide specification ───────────────────────────────────────────────────────
+slides:
+  model: GTV-H45   # (required) slide model ID — must exist in db/slides.yaml
+                   #   GTV-H45: standard, niche depth ≤ 600mm (rule 27)
+                   #   GTV-H53: heavy-duty, niche depth > 600mm (rule 27)
+
+  # nl: 500        # [default: maximum fitting] force a specific NL [mm] (rule 18)
+                   #   Must be in the model's available_lengths_mm list.
+                   #   Must not exceed max_box_depth.
+                   #   Omit to always use the deepest possible drawer.
+
+# ── Front panel gaps ──────────────────────────────────────────────────────────
+front:
+  top_gap:    50   # (required) gap above the front [mm]
+                   #   50mm for handleless drawers opened by fingers (rule 4)
+                   #   0mm if the drawer has a handle (pull clears the gap)
+
+  inset:     1.5   # (required) front inset from carcass face [mm] (rule 5)
+                   #   Standard: 1.5mm — front sits slightly behind the face
+
+  side_gap:    3   # (required) gap between front edge and carcass side [mm] (rule 11)
+  bottom_gap:  3   # (required) gap between bottom edge of front and carcass bottom [mm] (rule 11)

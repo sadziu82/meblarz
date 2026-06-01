@@ -122,11 +122,13 @@ def _build_drawer(
     mdf: float, bot: float,
     slide_cfg: dict,
     inset: float, side_gap: float, bot_gap: float,
+    target_nl: int | None = None,
 ) -> tuple[list[Board], list[tuple[str, str]], int]:
     """
     Calculate inner drawer geometry.
     Positions in niche coordinates (left-front-bottom = 0,0,0).
     front_H = front height (top_gap and bot_gap already subtracted by caller).
+    target_nl: if given, use this NL instead of the maximum fitting one (rule 18).
     Returns (boards, joints, nl).
     """
     slide_side = slide_cfg['side_clearance_mm']
@@ -136,9 +138,25 @@ def _build_drawer(
 
     front_D = mdf
 
-    box_W_ext = nw - 2 * slide_side
+    box_W_ext     = nw - 2 * slide_side
     max_box_depth = nd - (front_D + inset) - slide_rear
-    nl = _select_nl(slide_cfg['available_lengths_mm'], max_box_depth)
+
+    if target_nl is not None:
+        available = slide_cfg['available_lengths_mm']
+        if target_nl not in available:
+            raise ValueError(
+                f"NL {target_nl}mm not available for this slide model. "
+                f"Available lengths: {available}"
+            )
+        if target_nl > max_box_depth:
+            raise ValueError(
+                f"Requested NL {target_nl}mm exceeds maximum box depth "
+                f"{max_box_depth:.1f}mm for this niche"
+            )
+        nl = target_nl
+    else:
+        nl = _select_nl(slide_cfg['available_lengths_mm'], max_box_depth)
+
     box_depth = float(nl)
 
     side_H = round((2 / 3) * front_H)
@@ -308,6 +326,7 @@ def load_drawer(path: str) -> DrawerModel:
     bot = cfg['material']['bottom_thickness']
 
     slide_model_id = cfg['slides']['model']
+    target_nl      = cfg['slides'].get('nl', None)
     db = _load_slides_db()
     if slide_model_id not in db:
         raise ValueError(f"Unknown slide model: '{slide_model_id}'. Available: {list(db)}")
@@ -321,7 +340,8 @@ def load_drawer(path: str) -> DrawerModel:
     front_H = nh - top_gap - bot_gap
 
     boards, joints, nl = _build_drawer(nw, front_H, nd, mdf, bot, slide_cfg,
-                                       inset, side_gap, bot_gap)
+                                       inset, side_gap, bot_gap,
+                                       target_nl=target_nl)
     boards = _center_model(boards)
 
     return DrawerModel(

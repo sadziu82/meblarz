@@ -1,0 +1,95 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# DRESSER (CHEST OF DRAWERS) — complete configuration reference
+#
+# Usage: venv/bin/python viewer.py examples/dresser.yaml
+#
+# All rules referenced as (rule N) come from docs/design_rules.md.
+# Fields marked (required) must always be present.
+# Fields marked [default: X] are optional; the shown value is the default.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── External carcass dimensions ───────────────────────────────────────────────
+# height = total furniture height from floor to top, INCLUDING the plinth (rule 55).
+carcass:
+  width:  600    # (required) external width [mm]
+  height: 900    # (required) total height incl. plinth [mm]
+  depth:  500    # (required) external depth [mm]
+
+  placement: freestanding   # [default: freestanding]
+    # Determines which sides are visible → joint type (rule 57):
+    #   freestanding   — both sides visible → dowels on both sides
+    #   builtin_left   — left side against wall → confirmats on left, dowels on right
+    #   builtin_right  — right side against wall → dowels on left, confirmats on right
+    #   builtin_both   — both sides against walls → confirmats on both sides
+
+# ── Material thicknesses ──────────────────────────────────────────────────────
+material:
+  thickness:        18   # (required) MDF — carcass top, bottom, sides [mm] (rule 2)
+  back_thickness:    0   # [default: 0] 0 = open back (recommended for drawers, rule 3)
+  drawer_thickness: 18   # (required) MDF — drawer box sides, rear, front [mm] (rule 2)
+  drawer_bottom:    18   # (required) MDF — drawer box bottom [mm] (rule 7)
+
+# ── Plinth ────────────────────────────────────────────────────────────────────
+plinth:
+  height:      100   # [default: 0] plinth height [mm]; 0 = no plinth (rule 68)
+                     #   carcass.height includes this value (rule 55)
+  inset_front:  15   # [default: 15] inset from front face [mm] (rule 69)
+  inset_side:   15   # [default: 15] inset from side faces [mm] (rule 69)
+                     #   for builtin cabinets touching the wall: set to 0
+
+# ── Horizontal rail between drawers ──────────────────────────────────────────
+# One rail is inserted between each pair of adjacent drawers (rule 61).
+# count − 1 rails total. No rail above the top drawer or below the bottom one.
+rail:
+  depth:      100   # (required) rail depth [mm] — space behind rail is open (rule 67)
+  thickness:   18   # (required) MDF thickness [mm]
+
+  # Optional LED strip groove on the bottom face of the rail (rule 66).
+  # The groove faces downward and illuminates the open drawer below.
+  led_groove:
+    width:    12    # groove width [mm]
+    depth:     4    # groove depth [mm]
+    face:   bottom  # always bottom — faces the drawer below
+    offset:   20    # distance from front edge of rail [mm]
+
+# ── Drawers ───────────────────────────────────────────────────────────────────
+drawers:
+  count: 3   # (required) number of drawers
+
+  distribution: equal   # [default: equal]
+    # equal  — all drawer fronts share available height equally (rule 63)
+    # custom — heights specified explicitly below (rules 64–65)
+
+  # heights: [200, 200, 150]
+    # Only used when distribution: custom.
+    # List from BOTTOM to TOP drawer.
+    # May have fewer entries than count — missing drawers (topmost) are split equally.
+    # All entries are interpreted according to height_mode (below).
+
+  # height_mode: front    # [default: front] — only applies to distribution: custom
+    # front    — each value is the front panel height [mm]
+    # niche    — each value is the niche height; front_H = h − top_gap − bottom_gap
+    # interior — each value is max contents height; front_H = ⌊3h/2⌋  (rule 65)
+    # Numeric aliases: 1 = niche, 2 = interior, 3 = front (or omit)
+
+# ── Slide specification ───────────────────────────────────────────────────────
+slides:
+  model: GTV-H45   # (required) slide model ID — must exist in db/slides.yaml
+                   #   GTV-H45: standard, carcass depth ≤ 600mm (rule 27)
+                   #   GTV-H53: heavy-duty, carcass depth > 600mm (rule 27)
+
+  # nl: 450        # [default: maximum fitting] force a specific NL [mm] (rule 18)
+                   #   Applies to ALL drawers in this dresser (all share the same depth).
+                   #   Must be in the model's available_lengths_mm list.
+                   #   Must not exceed max_box_depth = carcass.depth − inset − mdf − rear_clearance.
+                   #   Omit to always build the deepest possible drawers.
+
+# ── Front panel gaps ──────────────────────────────────────────────────────────
+# Applied identically to every drawer front (rule 4, 5, 11).
+front:
+  inset:      1.5   # (required) front inset from carcass face [mm] (rule 5)
+  side_gap:     3   # (required) gap between front edge and carcass side [mm] (rule 11)
+  bottom_gap:   3   # (required) gap below each front (above rail or carcass bottom) [mm] (rule 11)
+  top_gap:     50   # (required) gap above each front (below rail or carcass top) [mm]
+                    #   50mm for handleless drawers (rule 4)
+                    #   Smaller values allowed when drawers have handles
