@@ -58,8 +58,9 @@ def bd(model):
 class TestBoardInventory:
 
     def test_total_board_count(self, model):
-        """3 plinth + 4 carcass + (N-1) rails + N×(5 structural + 6 slide) drawers."""
-        expected = 3 + 4 + (N_DRAW - 1) + N_DRAW * 11
+        """3 plinth + 4 carcass + (N-1) front rails + rear rails + N×11 drawers."""
+        n_rear = len([b for b in model.boards if b.name.startswith('rear_rail_')])
+        expected = 3 + 4 + (N_DRAW - 1) + n_rear + N_DRAW * 11
         assert len(model.boards) == expected
 
     def test_drawer_count(self, model):
@@ -81,9 +82,29 @@ class TestBoardInventory:
                 assert bd[name].movable, f"{name} powinien mieć movable=True"
 
     def test_rail_count(self, model):
-        """Liczba poprzeczek = drawers.count − 1 (reguła 60)."""
-        rails = [b for b in model.boards if b.name.startswith('rail_')]
+        """Front rail count = drawers.count − 1 (rule 61)."""
+        rails = [b for b in model.boards if b.name.startswith('rail_') and not b.name.startswith('rear_rail_')]
         assert len(rails) == N_DRAW - 1
+
+    def test_rear_rails_align_with_front_rails(self, model, bd):
+        """Each rear rail has the same Z as one of the front rails."""
+        front_zs = {bd[f'rail_{i}'].pos[2] for i in range(N_DRAW - 1)}
+        for b in model.boards:
+            if b.name.startswith('rear_rail_'):
+                assert b.pos[2] in front_zs, f"{b.name} at Z={b.pos[2]} has no matching front rail"
+
+    def test_rear_rail_vertical_gaps(self, model):
+        """Vertical gaps between rear support structures ≤ 800mm."""
+        rear = sorted([b for b in model.boards if b.name.startswith('rear_rail_')],
+                      key=lambda b: b.pos[2])
+        carcass_btm = next(b for b in model.boards if b.name == 'carcass_bottom')
+        # Use first top board found (may be split)
+        top_boards = [b for b in model.boards if b.name.startswith('carcass_top')]
+        z_anchor = carcass_btm.pos[2] + carcass_btm.height
+        z_top    = min(b.pos[2] for b in top_boards)
+        supports = [z_anchor] + [b.pos[2] + b.height for b in rear] + [z_top]
+        for a, b in zip(supports, supports[1:]):
+            assert b - a <= 800 + 1e-6, f"Rear gap {b - a:.0f}mm > 800mm"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

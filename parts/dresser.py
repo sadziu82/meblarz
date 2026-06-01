@@ -57,6 +57,37 @@ _C_CARCASS = (0.82, 0.67, 0.47, 1.0)
 _C_PLINTH  = (0.72, 0.57, 0.38, 1.0)
 _C_RAIL    = (0.65, 0.50, 0.33, 1.0)
 
+_REAR_RAIL_MAX_GAP = 800.0   # mm — max vertical unsupported span at the back
+
+
+def _select_rear_rails(rail_z: list[float], r_thick: float,
+                       z_bottom: float, z_top: float,
+                       max_gap: float = _REAR_RAIL_MAX_GAP) -> list[float]:
+    """
+    Select the minimum subset of front rail Z positions for rear support rails.
+    Greedy from the bottom: at each step take the highest front rail still
+    within max_gap of the last anchor, until the remaining span ≤ max_gap.
+    Returns sorted list of selected rail_z values.
+    """
+    candidates = sorted(rail_z)
+    selected: list[float] = []
+    anchor = z_bottom  # top surface of last rear support structure
+
+    while z_top - anchor > max_gap:
+        fitting = [rz for rz in candidates if rz > anchor and rz - anchor <= max_gap]
+        if fitting:
+            best = max(fitting)       # highest rail within range → maximises next span
+        else:
+            beyond = [rz for rz in candidates if rz > anchor]
+            if not beyond:
+                break
+            best = min(beyond)        # closest rail even if gap is exceeded
+        selected.append(best)
+        anchor = best + r_thick
+        candidates = [rz for rz in candidates if rz > best]
+
+    return selected
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -326,8 +357,43 @@ def load_dresser(path: str) -> DrawerModel:
 
         all_joints += [(f'rail_{i}', 'carcass_left_side'), (f'rail_{i}', 'carcass_right_side')]
 
+    # ─ Rear rails (structural support at the back) ────────────────────────────
+    rear_rail_z_list = _select_rear_rails(
+        rail_z, r_thick,
+        z_bottom=z_int_bottom,
+        z_top=carcass_h - thick,
+    )
+    rear_rail_boards: list[Board] = []
+    for j, rz in enumerate(rear_rail_z_list):
+        rear_rail_boards.append(Board(
+            name=f'rear_rail_{j}',
+            width=interior_W, height=r_thick, depth=r_depth,
+            pos=(thick, carcass_d - r_depth, rz),
+            color=_C_RAIL, movable=False,
+        ))
+
+    rear_r_y_pos = _joint_positions(carcass_d - r_depth, r_depth,
+                                    max_from_end=r_depth * 0.25)
+    for j, rail in enumerate(rear_rail_boards):
+        rz_center = rail.pos[2] + r_thick / 2
+        for yp in rear_r_y_pos:
+            jt_l = joint_type('left')
+            x_l1   = thick if jt_l == 'dowel' else 0
+            dir_l1 = '+x'  if jt_l == 'dowel' else '-x'
+            side_l.joint_holes.append(JH(x_l1,           yp, rz_center, dir_l1, 1, f'rear_rail_{j}',       jt_l))
+            rail.joint_holes.append(  JH(thick,           yp, rz_center, '-x',   2, 'carcass_left_side',   jt_l))
+
+            jt_r = joint_type('right')
+            x_r1   = carcass_w - thick if jt_r == 'dowel' else carcass_w
+            dir_r1 = '-x'              if jt_r == 'dowel' else '+x'
+            side_r.joint_holes.append(JH(x_r1,            yp, rz_center, dir_r1, 1, f'rear_rail_{j}',       jt_r))
+            rail.joint_holes.append(  JH(carcass_w-thick, yp, rz_center, '+x',   2, 'carcass_right_side',  jt_r))
+
+        all_joints += [(f'rear_rail_{j}', 'carcass_left_side'), (f'rear_rail_{j}', 'carcass_right_side')]
+
     all_boards.extend(carcass_boards)
     all_boards.extend(rail_boards)
+    all_boards.extend(rear_rail_boards)
 
     # ─ Drawers ────────────────────────────────────────────────────────────────
     nl_used = 0
