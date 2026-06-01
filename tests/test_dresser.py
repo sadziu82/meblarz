@@ -137,7 +137,7 @@ class TestCarcassDimensions:
         zs = [b.pos[2] for b in model.boards] + [b.pos[2]+b.height for b in model.boards]
         assert (min(xs)+max(xs))/2 == pytest.approx(0)
         assert (min(ys)+max(ys))/2 == pytest.approx(0)
-        assert (min(zs)+max(zs))/2 == pytest.approx(0)
+        assert min(zs) == pytest.approx(0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -267,13 +267,13 @@ class TestBoxDimensions:
         assert sr.pos[0] + sr.width == pytest.approx(bottom.pos[0] + bottom.width)
 
     def test_model_centered_at_origin(self, model):
-        """Bbox modelu wyśrodkowany w (0,0,0)."""
+        """X and Y centred at 0; Z bottom at 0 (floor)."""
         xs = [b.pos[0] for b in model.boards] + [b.pos[0] + b.width  for b in model.boards]
         ys = [b.pos[1] for b in model.boards] + [b.pos[1] + b.depth  for b in model.boards]
         zs = [b.pos[2] for b in model.boards] + [b.pos[2] + b.height for b in model.boards]
         assert (min(xs) + max(xs)) / 2 == pytest.approx(0)
         assert (min(ys) + max(ys)) / 2 == pytest.approx(0)
-        assert (min(zs) + max(zs)) / 2 == pytest.approx(0)
+        assert min(zs) == pytest.approx(0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

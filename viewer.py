@@ -93,6 +93,7 @@ ANIM_DURATION  = _cfg('animation.duration',          1.0)
 ANIM_FPS       = _cfg('animation.fps',               60)
 ALPHA_INACTIVE = _cfg('transparency.inactive',       0.15)
 ALPHA_SELECTED = _cfg('transparency.selected',       0.50)
+EYE_HEIGHT     = _cfg('initial_view.eye_height',     1500.0)   # mm
 
 
 # ── Help dialog ───────────────────────────────────────────────────────────────
@@ -179,7 +180,7 @@ class GLWidget(QOpenGLWidget):
         self.model: DrawerModel | None = None
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self.rot_x = _cfg('initial_view.rot_x', 25.0)
+        self.rot_x = _cfg('initial_view.rot_x', 0.0)
         self.rot_y = _cfg('initial_view.rot_y', -35.0)
         self.zoom  = _cfg('initial_view.zoom', 1.0)
         self.pan_x = 0.0
@@ -190,6 +191,7 @@ class GLWidget(QOpenGLWidget):
         self._pan_axis: str | None = None
         self._open_per_group: dict[str, float] = {}
         self._board_group_keys: list[str] = []
+        self._model_center_z: float = 0.0
         self._anim_targets: dict[str, float] = {}                   # grupa → cel (0.0–1.0)
         self._anim_start: dict[str, tuple[float, float]] = {}       # grupa → (wartość_startowa, czas)
         self._anim_timer = QTimer(self)
@@ -240,7 +242,7 @@ class GLWidget(QOpenGLWidget):
         self.update()
 
     def reset_view(self):
-        self.rot_x = _cfg('initial_view.rot_x', 25.0)
+        self.rot_x = _cfg('initial_view.rot_x', 0.0)
         self.rot_y = _cfg('initial_view.rot_y', -35.0)
         self.zoom  = _cfg('initial_view.zoom', 1.0)
         self.pan_x = 0.0; self.pan_z = 0.0
@@ -258,7 +260,8 @@ class GLWidget(QOpenGLWidget):
             xs = [b.pos[0] for b in model.boards] + [b.pos[0]+b.width  for b in model.boards]
             ys = [b.pos[1] for b in model.boards] + [b.pos[1]+b.depth  for b in model.boards]
             zs = [b.pos[2] for b in model.boards] + [b.pos[2]+b.height for b in model.boards]
-            self._scene_size = max(max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs), 300)
+            self._scene_size    = max(max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs), 300)
+            self._model_center_z = (min(zs) + max(zs)) / 2
         self.update()
 
     # ── OpenGL ────────────────────────────────────────────────────────────────
@@ -297,9 +300,11 @@ class GLWidget(QOpenGLWidget):
         self._update_projection()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
-        dist = self._scene_size * 2.5 / self.zoom
-        gluLookAt(self.pan_x, -dist, dist * 0.6 + self.pan_z,
-                  self.pan_x,     0,             self.pan_z,
+        dist     = self._scene_size * 2.5 / self.zoom
+        orbit_z  = self._model_center_z + self.pan_z   # camera orbits around furniture centre
+        eye_z    = EYE_HEIGHT           + self.pan_z   # camera stays at eye level above floor
+        gluLookAt(self.pan_x, -dist, eye_z,
+                  self.pan_x,     0, orbit_z,
                   0, 0, 1)
         glRotatef(self.rot_x, 1, 0, 0)
         glRotatef(self.rot_y, 0, 0, 1)

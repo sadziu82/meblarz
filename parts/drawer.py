@@ -286,13 +286,13 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
 
 
 def _center_model(boards: list[Board]) -> list[Board]:
-    """Shift the entire model so that the bounding-box centre is at (0,0,0)."""
+    """Centre the model in X and Y; place the bottom face at Z=0 (floor)."""
     xs = [b.pos[0] for b in boards] + [b.pos[0] + b.width  for b in boards]
     ys = [b.pos[1] for b in boards] + [b.pos[1] + b.depth  for b in boards]
     zs = [b.pos[2] for b in boards] + [b.pos[2] + b.height for b in boards]
     cx = (min(xs) + max(xs)) / 2
     cy = (min(ys) + max(ys)) / 2
-    cz = (min(zs) + max(zs)) / 2
+    cz = min(zs)   # bottom of model at Z=0 (floor)
     return _shift_boards(boards, -cx, -cy, -cz)
 
 

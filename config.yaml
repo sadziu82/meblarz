@@ -10,9 +10,10 @@ controls:
   zoom_step: 0.12   # multiplier — Ctrl+arrows and scroll wheel
 
 initial_view:
-  rot_x: 25.0    # degrees around X axis
-  rot_y: -35.0   # degrees around Z axis
+  rot_x: 0.0          # degrees around X axis (0 = horizontal, eye-level view)
+  rot_y: -35.0        # degrees around Z axis
   zoom:  1.0
+  eye_height: 1500    # mm — camera height above floor for default view
 
 transparency:
   inactive: 0.15   # other boards when one is selected (0.0–1.0)
