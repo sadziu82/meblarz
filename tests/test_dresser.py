@@ -1,15 +1,15 @@
 """
-Testy jednostkowe komody z szufladami wewnętrznymi.
-Weryfikują reguły 54–66 z reguly_projektowania.md.
+Unit tests for dresser (chest of drawers).
+Verifies rules 54–66 from design_rules.md.
 """
 from pathlib import Path
 import pytest
 
-from elementy.komoda import load_komoda, height_to_front_H
+from parts.dresser import load_dresser, height_to_front_H
 
-YAML_PATH = str(Path(__file__).parent.parent / 'projekty' / 'komoda.yaml')
+YAML_PATH = str(Path(__file__).parent.parent / 'projects' / 'dresser.yaml')
 
-# ── Parametry z komoda.yaml ────────────────────────────────────────────────────
+# ── Parameters from dresser.yaml ────────────────────────────────────────────────────
 CW, CH, CD  = 410, 2070, 1100
 THICK       = 18
 D_THICK     = 18
@@ -43,7 +43,7 @@ FRONT_HEIGHTS  = _GIVEN + _extra                    # [380,380,180,294,293]
 
 @pytest.fixture(scope='module')
 def model():
-    return load_komoda(YAML_PATH)
+    return load_dresser(YAML_PATH)
 
 
 @pytest.fixture(scope='module')
@@ -65,9 +65,9 @@ class TestBoardInventory:
     def test_drawer_count(self, model):
         assert model.drawer_count == N_DRAW
 
-    def test_corpus_boards_not_movable(self, bd):
+    def test_carcass_boards_not_movable(self, bd):
         """Deski korpusu, cokołu i poprzeczek są nieruchome."""
-        fixed = (['corpus_wierzch', 'corpus_spod', 'corpus_bok_lewy', 'corpus_bok_prawy',
+        fixed = (['carcass_top', 'carcass_bottom', 'carcass_left_side', 'carcass_right_side',
                   'plinth_front', 'plinth_left', 'plinth_right']
                  + [f'rail_{i}' for i in range(N_DRAW - 1)])
         for name in fixed:
@@ -90,46 +90,46 @@ class TestBoardInventory:
 # Wymiary korpusu (reguła 54)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestCorpusDimensions:
+class TestCarcassDimensions:
 
-    def test_wierzch_full_width(self, bd):
+    def test_carcass_top_full_width(self, bd):
         """Wierzch ma pełną szerokość zewnętrzną (reguła 54)."""
-        assert bd['corpus_wierzch'].width == pytest.approx(CW)
+        assert bd['carcass_top'].width == pytest.approx(CW)
 
-    def test_spod_full_width(self, bd):
+    def test_carcass_bottom_full_width(self, bd):
         """Spód ma pełną szerokość zewnętrzną (reguła 54)."""
-        assert bd['corpus_spod'].width == pytest.approx(CW)
+        assert bd['carcass_bottom'].width == pytest.approx(CW)
 
-    def test_wierzch_spod_depth(self, bd):
+    def test_carcass_top_bottom_depth(self, bd):
         """Wierzch i spód mają pełną głębokość."""
-        assert bd['corpus_wierzch'].depth == pytest.approx(CD)
-        assert bd['corpus_spod'].depth    == pytest.approx(CD)
+        assert bd['carcass_top'].depth == pytest.approx(CD)
+        assert bd['carcass_bottom'].depth    == pytest.approx(CD)
 
-    def test_wierzch_spod_thickness(self, bd):
+    def test_carcass_top_bottom_thickness(self, bd):
         """Wierzch i spód mają grubość MDF=18mm."""
-        assert bd['corpus_wierzch'].height == pytest.approx(THICK)
-        assert bd['corpus_spod'].height    == pytest.approx(THICK)
+        assert bd['carcass_top'].height == pytest.approx(THICK)
+        assert bd['carcass_bottom'].height    == pytest.approx(THICK)
 
-    def test_bok_height_equals_int_H(self, bd):
+    def test_side_height_equals_interior_H(self, bd):
         """Boki mają wysokość = int_H = height − 2×thick (reguła 54)."""
-        assert bd['corpus_bok_lewy'].height  == pytest.approx(INT_H)
-        assert bd['corpus_bok_prawy'].height == pytest.approx(INT_H)
+        assert bd['carcass_left_side'].height  == pytest.approx(INT_H)
+        assert bd['carcass_right_side'].height == pytest.approx(INT_H)
 
-    def test_bok_width_equals_thick(self, bd):
-        assert bd['corpus_bok_lewy'].width  == pytest.approx(THICK)
-        assert bd['corpus_bok_prawy'].width == pytest.approx(THICK)
+    def test_side_width_equals_thickness(self, bd):
+        assert bd['carcass_left_side'].width  == pytest.approx(THICK)
+        assert bd['carcass_right_side'].width == pytest.approx(THICK)
 
-    def test_bok_full_depth(self, bd):
-        assert bd['corpus_bok_lewy'].depth  == pytest.approx(CD)
-        assert bd['corpus_bok_prawy'].depth == pytest.approx(CD)
+    def test_side_full_depth(self, bd):
+        assert bd['carcass_left_side'].depth  == pytest.approx(CD)
+        assert bd['carcass_right_side'].depth == pytest.approx(CD)
 
-    def test_boks_span_full_height_between_wierzch_spod(self, bd):
+    def test_sides_span_between_top_and_bottom(self, bd):
         """Boki mieszczą się dokładnie między spodem a wierzchem."""
-        bok = bd['corpus_bok_lewy']
-        spod = bd['corpus_spod']
-        wierzch = bd['corpus_wierzch']
-        assert bok.pos[2] == pytest.approx(spod.pos[2] + spod.height)
-        assert bok.pos[2] + bok.height == pytest.approx(wierzch.pos[2])
+        bok = bd['carcass_left_side']
+        carcass_btm = bd['carcass_bottom']
+        carcass_top = bd['carcass_top']
+        assert bok.pos[2] == pytest.approx(carcass_btm.pos[2] + carcass_btm.height)
+        assert bok.pos[2] + bok.height == pytest.approx(carcass_top.pos[2])
 
     def test_model_centered_at_origin(self, model):
         xs = [b.pos[0] for b in model.boards] + [b.pos[0]+b.width  for b in model.boards]
@@ -163,11 +163,11 @@ class TestPlinth:
         assert bd['plinth_left'].height  == pytest.approx(PH)
         assert bd['plinth_right'].height == pytest.approx(PH)
 
-    def test_spod_sits_on_plinth(self, bd):
+    def test_carcass_bottom_sits_on_plinth(self, bd):
         """Spód korpusu zaczyna się na górze cokołu (reguła 65)."""
-        spod = bd['corpus_spod']
+        carcass_btm = bd['carcass_bottom']
         plinth = bd['plinth_front']
-        assert spod.pos[2] == pytest.approx(plinth.pos[2] + PH)
+        assert carcass_btm.pos[2] == pytest.approx(plinth.pos[2] + PH)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -192,10 +192,10 @@ class TestRails:
 
     def test_rails_inside_corpus(self, bd):
         """Poprzeczki zaczynają się na wewnętrznej krawędzi lewego boku."""
-        bok_l = bd['corpus_bok_lewy']
+        side_l = bd['carcass_left_side']
         for i in range(N_DRAW - 1):
             rail = bd[f'rail_{i}']
-            assert rail.pos[0] == pytest.approx(bok_l.pos[0] + THICK)
+            assert rail.pos[0] == pytest.approx(side_l.pos[0] + THICK)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -224,7 +224,7 @@ class TestHeightDistribution:
             front = bd[f'drawer_{i}_front']
             if i == 0:
                 # dno niszy = spód korpusu (górna ściana spodu)
-                ref = bd['corpus_spod']
+                ref = bd['carcass_bottom']
                 ref_top_z = ref.pos[2] + ref.height
             else:
                 rail = bd[f'rail_{i-1}']
@@ -244,8 +244,8 @@ class TestHeightDistribution:
                 ref_z = rail.pos[2]
             else:
                 # ostatnia szuflada → wierzch
-                wierzch = bd['corpus_wierzch']
-                ref_z = wierzch.pos[2]
+                carcass_top = bd['carcass_top']
+                ref_z = carcass_top.pos[2]
             gap = ref_z - front_top_z
             assert gap == pytest.approx(TOP_GAP), (
                 f"drawer_{i}_front: przerwa górna={gap}, oczekiwano {TOP_GAP}"
@@ -256,66 +256,66 @@ class TestHeightDistribution:
 # Połączenia korpusu (reguły 57, 32)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestCorpusJoints:
+class TestCarcassJoints:
 
-    def test_wierzch_bok_lewy_min_2_holes(self, bd):
+    def test_top_left_side_min_2_holes(self, bd):
         """Wierzch↔Bok lewy: min 2 otwory (reguła 32)."""
-        holes = [jh for jh in bd['corpus_wierzch'].joint_holes
-                 if jh.partner == 'corpus_bok_lewy']
+        holes = [jh for jh in bd['carcass_top'].joint_holes
+                 if jh.partner == 'carcass_left_side']
         assert len(holes) >= 2
 
-    def test_wierzch_bok_prawy_min_2_holes(self, bd):
-        holes = [jh for jh in bd['corpus_wierzch'].joint_holes
-                 if jh.partner == 'corpus_bok_prawy']
+    def test_top_right_side_min_2_holes(self, bd):
+        holes = [jh for jh in bd['carcass_top'].joint_holes
+                 if jh.partner == 'carcass_right_side']
         assert len(holes) >= 2
 
-    def test_spod_bok_min_2_holes(self, bd):
-        for side in ('corpus_bok_lewy', 'corpus_bok_prawy'):
-            holes = [jh for jh in bd['corpus_spod'].joint_holes if jh.partner == side]
+    def test_bottom_side_min_2_holes(self, bd):
+        for side in ('carcass_left_side', 'carcass_right_side'):
+            holes = [jh for jh in bd['carcass_bottom'].joint_holes if jh.partner == side]
             assert len(holes) >= 2
 
-    def test_wierzch_drilling_direction(self, bd):
+    def test_top_drilling_direction(self, bd):
         """Wierzch element 1: kołek od spodu (-Z), konfirmat od góry (+Z) (reguła 57)."""
         expected_dir = '-z' if PLACEMENT == 'freestanding' else '+z'
-        for jh in bd['corpus_wierzch'].joint_holes:
+        for jh in bd['carcass_top'].joint_holes:
             if jh.element == 1:
                 assert jh.direction == expected_dir, (
-                    f"corpus_wierzch el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
+                    f"carcass_top el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
                 )
 
-    def test_spod_drilling_direction(self, bd):
+    def test_bottom_drilling_direction(self, bd):
         """Spód element 1: kołek od góry (+Z), konfirmat od dołu (-Z) (reguła 57)."""
         expected_dir = '+z' if PLACEMENT == 'freestanding' else '-z'
-        for jh in bd['corpus_spod'].joint_holes:
+        for jh in bd['carcass_bottom'].joint_holes:
             if jh.element == 1:
                 assert jh.direction == expected_dir, (
-                    f"corpus_spod el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
+                    f"carcass_bottom el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
                 )
 
-    def test_corpus_joint_type_matches_placement(self, bd):
+    def test_carcass_joint_type_matches_placement(self, bd):
         """Typ połączeń wierzch/spód↔boki zgodny z placement (reguła 57, 55)."""
         expected = 'confirmat' if PLACEMENT == 'builtin_both' else 'dowel'
-        for board_name in ('corpus_wierzch', 'corpus_spod'):
+        for board_name in ('carcass_top', 'carcass_bottom'):
             for jh in bd[board_name].joint_holes:
                 assert jh.hole_type == expected, (
                     f"{board_name}→{jh.partner}: oczekiwano {expected}, jest {jh.hole_type}"
                 )
 
-    def test_bok_receives_holes_from_wierzch_and_spod(self, bd):
+    def test_side_receives_holes_from_top_and_bottom(self, bd):
         """Bok lewy ma otwory element=2 od wierzchu i spodu."""
-        bok_l = bd['corpus_bok_lewy']
-        from_wierzch = [jh for jh in bok_l.joint_holes if jh.partner == 'corpus_wierzch']
-        from_spod    = [jh for jh in bok_l.joint_holes if jh.partner == 'corpus_spod']
+        side_l = bd['carcass_left_side']
+        from_wierzch = [jh for jh in side_l.joint_holes if jh.partner == 'carcass_top']
+        from_spod    = [jh for jh in side_l.joint_holes if jh.partner == 'carcass_bottom']
         assert len(from_wierzch) >= 2
         assert len(from_spod)    >= 2
         assert all(jh.element == 2 for jh in from_wierzch)
         assert all(jh.element == 2 for jh in from_spod)
 
-    def test_corpus_joint_y_positions_max_spacing(self, bd):
+    def test_carcass_joint_y_max_spacing(self, bd):
         """Otwory wierzch↔bok wzdłuż Y: max 300mm odstęp (reguła 36)."""
         holes = sorted(
-            [jh for jh in bd['corpus_wierzch'].joint_holes
-             if jh.partner == 'corpus_bok_lewy'],
+            [jh for jh in bd['carcass_top'].joint_holes
+             if jh.partner == 'carcass_left_side'],
             key=lambda jh: jh.y
         )
         for i in range(len(holes) - 1):
@@ -332,8 +332,8 @@ class TestRailJoints:
         """Każda poprzeczka ma min 2 otwory do każdego boku (reguła 32)."""
         for i in range(N_DRAW - 1):
             rail = bd[f'rail_{i}']
-            left_holes  = [jh for jh in rail.joint_holes if jh.partner == 'corpus_bok_lewy']
-            right_holes = [jh for jh in rail.joint_holes if jh.partner == 'corpus_bok_prawy']
+            left_holes  = [jh for jh in rail.joint_holes if jh.partner == 'carcass_left_side']
+            right_holes = [jh for jh in rail.joint_holes if jh.partner == 'carcass_right_side']
             assert len(left_holes)  >= 2, f"rail_{i}↔bok_lewy: {len(left_holes)} otworów"
             assert len(right_holes) >= 2, f"rail_{i}↔bok_prawy: {len(right_holes)} otworów"
 
@@ -549,7 +549,7 @@ class TestHeightMode:
         }
         yaml_file = tmp_path / 'test_niche.yaml'
         yaml_file.write_text(_yaml.dump(cfg))
-        m = load_komoda(str(yaml_file))
+        m = load_dresser(str(yaml_file))
         bd = {b.name: b for b in m.boards}
         assert bd['drawer_0_front'].height == pytest.approx(147)
         assert bd['drawer_1_front'].height == pytest.approx(147)
@@ -575,7 +575,7 @@ class TestHeightMode:
         }
         yaml_file = tmp_path / 'test_interior.yaml'
         yaml_file.write_text(_yaml.dump(cfg))
-        m = load_komoda(str(yaml_file))
+        m = load_dresser(str(yaml_file))
         bd = {b.name: b for b in m.boards}
         assert bd['drawer_0_front'].height == pytest.approx(225)
         # Weryfikacja że zawartość (side_H) >= 150

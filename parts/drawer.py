@@ -1,7 +1,7 @@
 """
-Obliczenia geometrii szuflady wewnętrznej wg zasad_meblarskie.md.
-Wejście: wymiary wnęki + referencja do modelu prowadnicy z prowadnice.yaml.
-Wyjście: słownik z wymiarami wszystkich elementów i pozycjami otworów.
+Inner drawer geometry calculations per design_rules.md.
+Input: niche dimensions + slide model reference from db/slides.yaml.
+Output: DrawerModel with all board dimensions and hole positions.
 """
 
 from dataclasses import dataclass, field
@@ -12,24 +12,24 @@ import yaml
 
 @dataclass
 class Hole:
-    """Otwór montażowy prowadnicy."""
+    """Slide mounting hole."""
     x: float
     y: float
     z: float
     diameter: float
     depth: float
-    direction: str  # normalna powierzchni: '+x','-x','+y','-y','+z','-z'
+    direction: str  # surface normal: '+x','-x','+y','-y','+z','-z'
 
 
 @dataclass
 class JointHole:
-    """Otwór łączeniowy (konfirmat lub kołek) między dwoma deskami."""
+    """Joint hole (confirmat or dowel) between two boards."""
     x: float
     y: float
     z: float
-    direction: str      # normalna powierzchni (wiercenie w kierunku odwrotnym)
-    element: int        # 1 = pierwszy element (czerwony), 2 = drugi (zielony)
-    partner: str        # nazwa deski partnerskiej
+    direction: str      # surface normal (drilling in opposite direction)
+    element: int        # 1 = first element (red), 2 = second (green)
+    partner: str        # name of the partner board
     hole_type: str = 'confirmat'  # 'confirmat' | 'dowel'
 
 
@@ -43,7 +43,7 @@ class Board:
     color: Tuple[float, float, float, float] = (0.8, 0.65, 0.45, 1.0)
     holes: List[Hole] = field(default_factory=list)
     joint_holes: List[JointHole] = field(default_factory=list)
-    movable: bool = True  # False = element korpusu (nie przesuwa się przy otwarciu)
+    movable: bool = True  # False = carcass board (does not move on open)
 
 
 @dataclass
@@ -54,29 +54,29 @@ class DrawerModel:
     slide_model: str = ""
     slide_nl: int = 0
     joints: List[Tuple[str, str]] = field(default_factory=list)
-    drawer_count: int = 0  # 0 = samodzielna szuflada, >0 = komoda
+    drawer_count: int = 0  # 0 = standalone drawer, >0 = dresser
 
 
 _SLIDES_DB: dict | None = None
 
+
 def _load_slides_db() -> dict:
     global _SLIDES_DB
     if _SLIDES_DB is None:
-        db_path = Path(__file__).parent.parent / 'baza' / 'prowadnice.yaml'
+        db_path = Path(__file__).parent.parent / 'db' / 'slides.yaml'
         with open(db_path) as f:
-            _SLIDES_DB = yaml.safe_load(f)['prowadnice']
+            _SLIDES_DB = yaml.safe_load(f)['slides']
     return _SLIDES_DB
 
 
 def _joint_positions(start: float, length: float,
                      max_from_end: float = 100, max_spacing: float = 300) -> list[float]:
     """
-    Pozycje konfirmatów / kołków wzdłuż krawędzi (zasady 36/39):
-    1/4 i 3/4 długości, ale nie dalej niż max_from_end od końca.
-    Jeśli odstęp >300mm – dodaj pośrednie w równych odstępach.
+    Joint hole positions along an edge (rules 36/39):
+    1/4 and 3/4 of length, but no further than max_from_end from either end.
+    If spacing >300mm — add intermediate holes at equal intervals.
     """
-    # Pozycje liczone RELATIVE (od 0), zaokrąglone do mm, potem dodajemy start
-    # Próg 40mm: krótsza krawędź → 1 otwór w środku (zbyt mało miejsca na 2)
+    # Threshold 40mm: short edge → 1 hole in center (not enough room for 2)
     if length < 40:
         return [start + round(length / 2)]
     p1 = round(min(length * 0.25, max_from_end))
@@ -92,22 +92,20 @@ def _joint_positions(start: float, length: float,
 
 
 def _select_nl(available: list[int], max_depth: float) -> int:
-    """Wybierz największe NL nieprzekraczające max_depth."""
+    """Select the largest NL not exceeding max_depth."""
     candidates = [nl for nl in sorted(available) if nl <= max_depth]
     if not candidates:
         raise ValueError(
-            f"Żadne dostępne NL ({available}) nie mieści się w głębokości {max_depth:.1f}mm"
+            f"No available NL ({available}) fits within depth {max_depth:.1f}mm"
         )
     return candidates[-1]
 
 
 def _mount_holes_y(slide_cfg: dict, nl: int, y_start: float) -> list[float]:
-    """
-    Generuje absolutne pozycje Y otworów montażowych prowadnicy na boku skrzynki.
-    """
-    mount = slide_cfg['montaz_szuflada_wewnetrzna']
-    first = mount['pierwszy_otwor_od_krawedzi_mm']
-    spacings = mount['schemat_odstepow_mm']
+    """Generate absolute Y positions of slide mounting holes on the box side."""
+    mount = slide_cfg['inner_drawer_mount']
+    first = mount['first_hole_from_edge_mm']
+    spacings = mount['spacing_pattern_mm']
 
     positions = [first]
     for s in spacings:
@@ -126,21 +124,21 @@ def _build_drawer(
     inset: float, side_gap: float, bot_gap: float,
 ) -> tuple[list[Board], list[tuple[str, str]], int]:
     """
-    Oblicza geometrię szuflady wewnętrznej.
-    Pozycje we współrzędnych niszy (lewy-przód-spód = 0,0,0).
-    front_H = wysokość frontu (już po odjęciu top_gap i bot_gap przez wywołującego).
-    Zwraca (boards, joints, nl).
+    Calculate inner drawer geometry.
+    Positions in niche coordinates (left-front-bottom = 0,0,0).
+    front_H = front height (top_gap and bot_gap already subtracted by caller).
+    Returns (boards, joints, nl).
     """
-    slide_side = slide_cfg['luz_boczny_mm']
-    slide_rear = slide_cfg['luz_tylny_mm']
-    hole_d   = slide_cfg['montaz_szuflada_wewnetrzna']['srednica_otworow_skrzynka_mm']
-    hole_dep = slide_cfg['montaz_szuflada_wewnetrzna']['glebokos_otworow_mm']
+    slide_side = slide_cfg['side_clearance_mm']
+    slide_rear = slide_cfg['rear_clearance_mm']
+    hole_d   = slide_cfg['inner_drawer_mount']['box_hole_diameter_mm']
+    hole_dep = slide_cfg['inner_drawer_mount']['hole_depth_mm']
 
     front_D = mdf
 
     box_W_ext = nw - 2 * slide_side
     max_box_depth = nd - (front_D + inset) - slide_rear
-    nl = _select_nl(slide_cfg['dostepne_dlugosci_mm'], max_box_depth)
+    nl = _select_nl(slide_cfg['available_lengths_mm'], max_box_depth)
     box_depth = float(nl)
 
     side_H = round((2 / 3) * front_H)
@@ -269,7 +267,7 @@ def _build_drawer(
 
 
 def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[Board]:
-    """Przesuwa wszystkie deski i ich otwory o podany offset."""
+    """Shift all boards and their holes by the given offset."""
     result = []
     for b in boards:
         result.append(Board(
@@ -288,7 +286,7 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
 
 
 def _center_model(boards: list[Board]) -> list[Board]:
-    """Przesuwa cały model tak, by centrum bboxa znalazło się w (0,0,0)."""
+    """Shift the entire model so that the bounding-box centre is at (0,0,0)."""
     xs = [b.pos[0] for b in boards] + [b.pos[0] + b.width  for b in boards]
     ys = [b.pos[1] for b in boards] + [b.pos[1] + b.depth  for b in boards]
     zs = [b.pos[2] for b in boards] + [b.pos[2] + b.height for b in boards]
@@ -312,11 +310,11 @@ def load_drawer(path: str) -> DrawerModel:
     slide_model_id = cfg['slides']['model']
     db = _load_slides_db()
     if slide_model_id not in db:
-        raise ValueError(f"Nieznany model prowadnicy: '{slide_model_id}'. Dostępne: {list(db)}")
+        raise ValueError(f"Unknown slide model: '{slide_model_id}'. Available: {list(db)}")
     slide_cfg = db[slide_model_id]
 
-    top_gap = cfg['front']['top_gap']
-    inset   = cfg['front']['inset']
+    top_gap  = cfg['front']['top_gap']
+    inset    = cfg['front']['inset']
     side_gap = cfg['front']['side_gap']
     bot_gap  = cfg['front']['bottom_gap']
 
@@ -332,4 +330,5 @@ def load_drawer(path: str) -> DrawerModel:
         slide_model=slide_model_id,
         slide_nl=nl,
         joints=joints,
+        drawer_count=0,
     )

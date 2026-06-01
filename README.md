@@ -1,167 +1,170 @@
 # Meblarz
 
-Narzędzie do parametrycznego projektowania mebli i wizualizacji 3D.
+Parametric furniture design and 3D visualisation tool.
 
-## Wymagania
+## Requirements
 
 ```bash
-# Debian/Ubuntu – sterownik OpenGL NVIDIA
+# Debian/Ubuntu — NVIDIA OpenGL driver
 sudo apt install libglx-nvidia0
 
-# Środowisko Python
+# Python environment
 python3 -m venv venv
 venv/bin/pip install PyQt6 PyOpenGL PyOpenGL_accelerate numpy PyYAML
 ```
 
-## Uruchamianie
+## Running
 
 ```bash
-venv/bin/python viewer.py projekty/szuflada.yaml
-venv/bin/python viewer.py projekty/komoda.yaml
+venv/bin/python viewer.py projects/drawer.yaml
+venv/bin/python viewer.py projects/dresser.yaml
 ```
 
-Typ modelu wykrywany automatycznie po kluczach YAML (`niche` → szuflada, `carcass` → komoda).
+Model type is detected automatically from YAML keys (`niche` → drawer, `carcass` → dresser).
 
-## Sterowanie
+## Controls
 
-| Skrót | Akcja |
+| Shortcut | Action |
 |---|---|
-| **Lewy drag** | Obracanie kamery |
-| **Prawy drag** | Przesuwanie (pan, blokada osi) |
-| **Kółko myszy** | Zoom |
-| **Lewy klik** | Zaznaczenie elementu |
-| `Shift` + strzałki | Obracanie kamery |
-| Strzałki | Przesuwanie (pan) |
+| **Left drag** | Rotate camera |
+| **Right drag** | Pan (axis lock) |
+| **Scroll wheel** | Zoom |
+| **Left click** | Select board |
+| **Ctrl + left click** | Open / close movable element |
+| `Shift` + arrows | Rotate camera |
+| Arrows | Pan |
 | `Ctrl` + `↑` / `↓` | Zoom in / out |
-| `Home` | Reset widoku |
-| `P` | Perspektywa / ortho |
-| `N` | Wymiary zaznaczonego (kolejne N: +otwory) |
-| `H` | Pomoc (lista skrótów) |
-| `+` / `-` | Otwieranie / zamykanie szuflad |
-| `Ctrl+O` | Wczytaj plik YAML |
-| `Ctrl+R` | Przeładuj bieżący plik |
-| `2×Esc` lub `Ctrl+Q` | Wyjście |
+| `Home` | Reset view |
+| `P` | Perspective / ortho |
+| `N` | Dimensions of selected (next N: +holes) |
+| `H` | Help (shortcut list) |
+| `+` / `-` | Open / close all drawers |
+| `Ctrl+O` | Open YAML file |
+| `Ctrl+R` | Reload current file |
+| `2×Esc` or `Ctrl+Q` | Quit |
 
-## Struktura projektu
+## Project structure
 
 ```
 meblarz/
-├── baza/
-│   └── prowadnice.yaml         # baza modeli prowadnic kulkowych
+├── db/
+│   └── slides.yaml             # ball-bearing slide model database
 ├── docs/
-│   └── reguly_projektowania.md # zasady projektowania mebli
-├── elementy/
-│   ├── szuflada.py             # szuflada wewnętrzna bez uchwytu
-│   └── komoda.py               # szafka z szufladami wewnętrznymi
-├── projekty/
-│   ├── szuflada.yaml           # przykład: samodzielna szuflada
-│   └── komoda.yaml             # przykład: komoda z szufladami
+│   ├── reguly_projektowania.md # design rules (Polish — authoritative)
+│   └── design_rules.md         # design rules (English translation)
+├── parts/
+│   ├── drawer.py               # inner drawer without handle
+│   └── dresser.py              # chest of drawers
+├── projects/
+│   ├── drawer.yaml             # example: standalone drawer
+│   └── dresser.yaml            # example: dresser with drawers
 ├── tests/
-│   ├── test_szuflada.py
-│   └── test_komoda.py
-└── viewer.py                   # aplikacja 3D
+│   ├── test_drawer.py
+│   └── test_dresser.py
+├── config.yaml                 # viewer configuration
+└── viewer.py                   # 3D viewer application
 ```
 
 ---
 
-## Format YAML — szuflada wewnętrzna
+## YAML format — inner drawer
 
 ```yaml
 niche:
-  width:  410   # szerokość wnęki [mm]
-  height: 420   # wysokość wnęki [mm]
-  depth: 1000   # głębokość wnęki [mm]
+  width:  410   # niche width [mm]
+  height: 420   # niche height [mm]
+  depth: 1000   # niche depth [mm]
 
 material:
-  thickness:        18   # grubość MDF boczków/tyłu/frontu [mm]
-  bottom_thickness: 18   # grubość dna skrzynki [mm]
+  thickness:        18   # MDF thickness — sides / rear / front [mm]
+  bottom_thickness: 18   # box bottom thickness [mm]
 
 slides:
-  model: GTV-H53   # ID modelu z baza/prowadnice.yaml
+  model: GTV-H53   # model ID from db/slides.yaml
 
 front:
-  top_gap:    50   # przerwa górna frontu [mm] (50 = bez uchwytu)
-  inset:     1.5   # cofnięcie frontu względem lica [mm]
-  side_gap:    3   # szczelina boczna [mm]
-  bottom_gap:  3   # szczelina dolna [mm]
+  top_gap:    50   # front top gap [mm] (50 = handleless)
+  inset:     1.5   # front inset from carcass face [mm]
+  side_gap:    3   # side gap [mm]
+  bottom_gap:  3   # bottom gap [mm]
 ```
 
-**Prowadnice:** `GTV-H45` (głębokość ≤ 600 mm), `GTV-H53` (głębokość > 600 mm).
+**Slides:** `GTV-H45` (depth ≤ 600 mm), `GTV-H53` (depth > 600 mm).
 
 ---
 
-## Format YAML — komoda z szufladami
+## YAML format — dresser with drawers
 
 ```yaml
 carcass:
-  width:  800    # szerokość zewnętrzna [mm]
-  height: 2070   # całkowita wysokość mebla wliczając cokoł [mm]
-  depth:  1100   # głębokość zewnętrzna [mm]
+  width:  800    # external width [mm]
+  height: 2070   # total furniture height including plinth [mm]
+  depth:  1100   # external depth [mm]
   placement: freestanding
   # placement: freestanding | builtin_left | builtin_right | builtin_both
-  # freestanding = oba boki widoczne → kołki
-  # builtin_*    = boki przy ścianie niewidoczne → konfirmaty od tej strony
+  # freestanding = both sides visible → dowels
+  # builtin_*    = sides against wall hidden → confirmats on that side
 
 material:
-  thickness:        18   # MDF – wierzch, spód, boki korpusu [mm]
-  back_thickness:    0   # 0 = tył otwarty (zalecane dla szuflad)
-  drawer_thickness: 18   # MDF – elementy skrzynki szuflady [mm]
-  drawer_bottom:    18   # MDF – dno skrzynki szuflady [mm]
+  thickness:        18   # MDF — top, bottom, carcass sides [mm]
+  back_thickness:    0   # 0 = open back (recommended for drawers)
+  drawer_thickness: 18   # MDF — drawer box parts [mm]
+  drawer_bottom:    18   # MDF — drawer box bottom [mm]
 
 plinth:
-  height:      100   # wysokość cokołu [mm]; 0 = brak cokołu
-  inset_front:  15   # wcięcie cokołu od lica frontu [mm]
-  inset_side:   15   # wcięcie cokołu od boków [mm]
+  height:      100   # plinth height [mm]; 0 = no plinth
+  inset_front:  15   # plinth inset from front face [mm]
+  inset_side:   15   # plinth inset from sides [mm]
 
-rail:                   # poprzeczka między szufladami (z rowkiem LED)
-  depth:      100       # głębokość poprzeczki [mm]
-  thickness:   18       # grubość MDF [mm]
+rail:                   # horizontal rail between drawers (with LED groove)
+  depth:      100       # rail depth [mm]
+  thickness:   18       # MDF thickness [mm]
   led_groove:
-    width:    12        # szerokość rowka [mm]
-    depth:     4        # głębokość rowka [mm]
-    face:   bottom      # rowek na spodniej ścianie poprzeczki
-    offset:   20        # odległość od przedniej krawędzi [mm]
+    width:    12        # groove width [mm]
+    depth:     4        # groove depth [mm]
+    face:   bottom      # groove on the bottom face of the rail
+    offset:   20        # distance from front edge [mm]
 
 drawers:
   count: 4
   distribution: equal   # equal | custom
 
-  # Przy distribution: custom — lista wysokości od najniższej do najwyższej.
-  # Można podać mniej wartości niż count — reszta wyliczona równo.
+  # With distribution: custom — heights list from lowest to highest.
+  # Fewer values than count allowed — remainder split equally.
   # heights: [380, 380, 180]
 
-  # Tryb interpretacji podanych wysokości (dotyczy tylko distribution: custom):
-  # height_mode: front      # (domyślnie) wysokość frontu szuflady
-  # height_mode: niche      # wysokość wnęki (front_H = niche_H − top_gap − bot_gap)
-  # height_mode: interior   # max wysokość zawartości (side_H ≥ h; front_H = ⌊3h/2⌋)
-  # Aliasy numeryczne: 1 = niche, 2 = interior, 3 = front
+  # How to interpret the given heights (only with distribution: custom):
+  # height_mode: front      # (default) front height
+  # height_mode: niche      # niche height (front_H = niche_H − top_gap − bot_gap)
+  # height_mode: interior   # max contents height (side_H ≥ h; front_H = ⌊3h/2⌋)
+  # Numeric aliases: 1 = niche, 2 = interior, 3 = front
 
 slides:
-  model: GTV-H45   # ID modelu z baza/prowadnice.yaml
+  model: GTV-H45   # model ID from db/slides.yaml
 
 front:
-  inset:      1.5   # cofnięcie frontów względem lica korpusu [mm]
-  side_gap:     3   # szczelina boczna każdego frontu [mm]
-  bottom_gap:   3   # szczelina pod każdym frontem [mm]
-  top_gap:     50   # przerwa na palce nad każdym frontem [mm]
+  inset:      1.5   # front inset from carcass face [mm]
+  side_gap:     3   # side gap per front [mm]
+  bottom_gap:   3   # bottom gap per front [mm]
+  top_gap:     50   # finger clearance above each front [mm]
 ```
 
-### Tryby height_mode
+### height_mode summary
 
-| Tryb | Co podajesz | Przeliczenie |
+| Mode | Input | Conversion |
 |---|---|---|
-| `front` (domyślny) | wysokość frontu | bez przeliczenia |
-| `niche` | wysokość wnęki na szufladę | `front_H = h − top_gap − bot_gap` |
-| `interior` | max wysokość rzeczy w szufladzie | `front_H = ⌊3h/2⌋` (min. front dla `side_H ≥ h`) |
+| `front` (default) | front height | none |
+| `niche` | niche height per drawer | `front_H = h − top_gap − bot_gap` |
+| `interior` | max contents height | `front_H = ⌊3h/2⌋` (min front for `side_H ≥ h`) |
 
-### Podział wysokości (distribution: custom, częściowa lista)
+### Height distribution (distribution: custom, partial list)
 
-Jeśli `len(heights) < count`, brakujące szuflady (od góry) wyliczane są jako równy
-podział pozostałej dostępnej wysokości. Brakujące zawsze traktowane jako `front_H`.
+If `len(heights) < count`, the missing drawers (from the top) are calculated as an equal
+split of the remaining available height. Missing values are always treated as `front_H`.
 
 ---
 
-## Testy
+## Tests
 
 ```bash
 venv/bin/python -m pytest tests/ -v

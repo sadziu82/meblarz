@@ -1,19 +1,19 @@
-# Konfiguracja oglądarka mebli (viewer.py)
+# Viewer configuration (viewer.py)
 
-animacja:
-  czas: 1.0    # sekundy — czas otwarcia / zamknięcia szuflady
+animation:
+  duration: 1.0   # seconds — open / close animation time
   fps: 60
 
-przezroczystosc:
-  nieaktywne: 0.15   # pozostałe elementy gdy jeden jest zaznaczony (0.0–1.0)
-  zaznaczone: 0.50   # zaznaczony element (0.0–1.0)
+controls:
+  pan_step:  15.0   # mm — arrow keys (pan)
+  rot_step:  4.0    # degrees — Shift+arrows
+  zoom_step: 0.12   # multiplier — Ctrl+arrows and scroll wheel
 
-sterowanie:
-  krok_przesuwania: 15.0   # mm — strzałki (pan)
-  krok_obrotu: 4.0          # stopnie — Shift+strzałki
-  krok_zoomu: 0.12          # mnożnik — Ctrl+strzałki i kółko myszy
+initial_view:
+  rot_x: 25.0    # degrees around X axis
+  rot_y: -35.0   # degrees around Z axis
+  zoom:  1.0
 
-widok_startowy:
-  obrot_x: 25.0    # stopnie wokół osi X
-  obrot_y: -35.0   # stopnie wokół osi Z
-  zoom: 1.0
+transparency:
+  inactive: 0.15   # other boards when one is selected (0.0–1.0)
+  selected: 0.50   # selected board (0.0–1.0)

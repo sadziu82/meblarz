@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Meblarz Viewer – oglądarka modeli mebli.
+Meblarz Viewer — 3D furniture model viewer.
 
-Użycie:
-    venv/bin/python viewer.py <plik.yaml>
+Usage:
+    venv/bin/python viewer.py <file.yaml>
 
-Skróty klawiaturowe:
-    Ctrl+O          wczytaj nowy plik
-    Ctrl+R          przeładuj bieżący plik
-    Home            resetuj widok
-    Strzałki        przesuwanie (pan)
-    Shift+Strzałki  obracanie
+Keyboard shortcuts:
+    Ctrl+O          open file
+    Ctrl+R          reload current file
+    Home            reset view
+    Arrows          pan
+    Shift+Arrows    rotate
     Ctrl+↑/↓        zoom in / out
-    2×Esc / Ctrl+Q  wyjście
+    2×Esc / Ctrl+Q  quit
 """
 
 import sys
@@ -34,8 +34,8 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 import yaml as _yaml
-from elementy.szuflada import DrawerModel, Board, Hole, JointHole, load_drawer
-from elementy.komoda import load_komoda
+from parts.drawer import DrawerModel, Board, Hole, JointHole, load_drawer
+from parts.dresser import load_dresser as load_komoda
 
 
 def _load_config() -> dict:
@@ -48,7 +48,7 @@ def _load_config() -> dict:
 
 
 def _cfg(key: str, default):
-    """Pobiera zagnieżdżoną wartość z configa, np. 'animacja.czas'."""
+    """Return a nested config value, e.g. 'animation.duration'."""
     node = _CFG
     for k in key.split('.'):
         if not isinstance(node, dict) or k not in node:
@@ -61,7 +61,7 @@ _CFG = _load_config()
 
 
 def _movable_group(board: Board) -> str:
-    """Zwraca klucz grupy ruchomej (np. 'drawer_0') lub 'default' dla wolnostojącej szuflady."""
+    """Return the movable-group key (e.g. 'drawer_0') or 'default' for standalone drawers."""
     m = re.match(r'^(drawer_\d+)_', board.name)
     return m.group(1) if m else 'default'
 
@@ -84,52 +84,52 @@ def _ray_aabb(ro, rd, bmin, bmax):
     return tmin if tmin >= 0 else tmax
 
 
-# ── Stałe sterowania ──────────────────────────────────────────────────────────
+# ── Control constants ─────────────────────────────────────────────────────────
 
-PAN_STEP       = _cfg('sterowanie.krok_przesuwania',  15.0)
-ROT_STEP       = _cfg('sterowanie.krok_obrotu',      4.0)
-ZOOM_STEP      = _cfg('sterowanie.krok_zoomu',       0.12)
-ANIM_DURATION  = _cfg('animacja.czas',               1.0)
-ANIM_FPS       = _cfg('animacja.fps',                60)
-ALPHA_INACTIVE = _cfg('przezroczystosc.nieaktywne',  0.15)
-ALPHA_SELECTED = _cfg('przezroczystosc.zaznaczone',  0.50)
+PAN_STEP       = _cfg('controls.pan_step',           15.0)
+ROT_STEP       = _cfg('controls.rot_step',           4.0)
+ZOOM_STEP      = _cfg('controls.zoom_step',          0.12)
+ANIM_DURATION  = _cfg('animation.duration',          1.0)
+ANIM_FPS       = _cfg('animation.fps',               60)
+ALPHA_INACTIVE = _cfg('transparency.inactive',       0.15)
+ALPHA_SELECTED = _cfg('transparency.selected',       0.50)
 
 
-# ── Okno pomocy ───────────────────────────────────────────────────────────────
+# ── Help dialog ───────────────────────────────────────────────────────────────
 
 _SHORTCUTS = [
-    ("Widok", [
-        ("Home",            "reset widoku"),
-        ("P",               "przełącz perspektywę / ortho"),
-        ("Shift + ←→↑↓",   "obracanie"),
-        ("↑↓←→",           "przesuwanie (pan)"),
-        ("Ctrl + ↑ / ↓",   "zoom in / out"),
-        ("Kółko myszy",     "zoom"),
-        ("N",               "wymiary zaznaczonego (kolejne: +otwory)"),
+    ("View", [
+        ("Home",               "reset view"),
+        ("P",                  "toggle perspective / ortho"),
+        ("Shift + ←→↑↓",      "rotate"),
+        ("↑↓←→",              "pan"),
+        ("Ctrl + ↑ / ↓",      "zoom in / out"),
+        ("Scroll wheel",       "zoom"),
+        ("N",                  "dimensions of selected (next: +holes)"),
     ]),
-    ("Mysz", [
-        ("Lewy drag",          "obracanie"),
-        ("Prawy drag",         "przesuwanie (blokada osi)"),
-        ("Lewy klik",          "zaznaczenie elementu"),
-        ("Ctrl + lewy klik",   "otwórz / zamknij element ruchomy"),
+    ("Mouse", [
+        ("Left drag",          "rotate"),
+        ("Right drag",         "pan (axis lock)"),
+        ("Left click",         "select board"),
+        ("Ctrl + left click",  "open / close movable element"),
     ]),
-    ("Szuflada", [
-        ("+ / -",           "otwieranie / zamykanie"),
+    ("Drawers", [
+        ("+ / -",              "open / close all"),
     ]),
-    ("Plik", [
-        ("Ctrl+O",          "otwórz plik YAML"),
-        ("Ctrl+R",          "przeładuj bieżący plik"),
+    ("File", [
+        ("Ctrl+O",             "open YAML file"),
+        ("Ctrl+R",             "reload current file"),
     ]),
-    ("Aplikacja", [
-        ("H",               "ta pomoc"),
-        ("2 × Esc / Ctrl+Q","wyjście"),
+    ("App", [
+        ("H",                  "this help"),
+        ("2 × Esc / Ctrl+Q",   "quit"),
     ]),
 ]
 
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Skróty klawiaturowe")
+        self.setWindowTitle("Keyboard shortcuts")
         self.setModal(False)
         self.setMinimumWidth(400)
 
@@ -143,7 +143,7 @@ class HelpDialog(QDialog):
         layout.setSpacing(2)
         layout.setContentsMargins(18, 14, 18, 14)
 
-        title = QLabel("Skróty klawiaturowe")
+        title = QLabel("Keyboard shortcuts")
         f = QFont(); f.setPointSize(12); f.setBold(True)
         title.setFont(f)
         title.setStyleSheet("color: #fff; margin-bottom: 6px;")
@@ -160,7 +160,7 @@ class HelpDialog(QDialog):
                 lbl.setStyleSheet("font-family: monospace; color: #ddd; padding: 1px 0;")
                 layout.addWidget(lbl)
 
-        hint = QLabel("Zamknij: Esc")
+        hint = QLabel("Close: Esc")
         hint.setStyleSheet("color: #888; margin-top: 10px; font-size: 10pt;")
         layout.addWidget(hint)
 
@@ -179,9 +179,9 @@ class GLWidget(QOpenGLWidget):
         self.model: DrawerModel | None = None
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self.rot_x = _cfg('widok_startowy.obrot_x', 25.0)
-        self.rot_y = _cfg('widok_startowy.obrot_y', -35.0)
-        self.zoom  = _cfg('widok_startowy.zoom',    1.0)
+        self.rot_x = _cfg('initial_view.rot_x', 25.0)
+        self.rot_y = _cfg('initial_view.rot_y', -35.0)
+        self.zoom  = _cfg('initial_view.zoom', 1.0)
         self.pan_x = 0.0
         self.pan_z = 0.0
 
@@ -240,9 +240,9 @@ class GLWidget(QOpenGLWidget):
         self.update()
 
     def reset_view(self):
-        self.rot_x = _cfg('widok_startowy.obrot_x', 25.0)
-        self.rot_y = _cfg('widok_startowy.obrot_y', -35.0)
-        self.zoom  = _cfg('widok_startowy.zoom',    1.0)
+        self.rot_x = _cfg('initial_view.rot_x', 25.0)
+        self.rot_y = _cfg('initial_view.rot_y', -35.0)
+        self.zoom  = _cfg('initial_view.zoom', 1.0)
         self.pan_x = 0.0; self.pan_z = 0.0
         self.update()
 
@@ -558,44 +558,44 @@ class GLWidget(QOpenGLWidget):
 # ── Info overlay ─────────────────────────────────────────────────────────────
 
 def _board_info_text(board: Board, level: int) -> str:
-    """Tekst wymiaru/otworów w lokalnym układzie (x=width, y=height, depth=Y)."""
+    """Dimensions / holes text in local coordinates (x=width, y=height, depth=Y)."""
     lines = [
         f"  {board.name}",
         f"  {board.width:.1f} × {board.height:.1f} × {board.depth:.1f} mm",
-        f"  (szer × wys × grub)",
+        f"  (W × H × thickness)",
     ]
     if level >= 2 and (board.holes or board.joint_holes):
         lines.append("")
-        lines.append("  Otwory (x, y od lewego dolnego):")
+        lines.append("  Holes (x, y from bottom-left):")
         for h in board.holes:
             lx = h.x - board.pos[0]
             ly = h.z - board.pos[2]
-            lines.append(f"   prowadnica  x={lx:.1f}  y={ly:.1f}  ø{h.diameter:.1f}  głęb={h.depth:.1f}")
+            lines.append(f"   slide   x={lx:.1f}  y={ly:.1f}  ø{h.diameter:.1f}  depth={h.depth:.1f}")
         for jh in board.joint_holes:
             lx = jh.x - board.pos[0]
             ly = jh.z - board.pos[2]
             ld = jh.y - board.pos[1]
-            label = "kołek" if jh.hole_type == 'dowel' else "konfirmat"
+            label = "dowel" if jh.hole_type == 'dowel' else "confirmat"
             elem  = "e1" if jh.element == 1 else "e2"
-            depth_info = f"środek grub." if abs(ld - board.depth / 2) < 1.0 else f"głęb={ld:.1f}"
+            depth_info = "mid-thickness" if abs(ld - board.depth / 2) < 1.0 else f"depth={ld:.1f}"
             lines.append(f"   {label} ({elem}) → {jh.partner:<12} x={lx:.1f}  y={ly:.1f}  {depth_info}")
     return "\n".join(lines)
 
 
-# ── Okno główne ───────────────────────────────────────────────────────────────
+# ── Main window ───────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
     def __init__(self, yaml_path: str):
         super().__init__()
         self._yaml_path = yaml_path
         self._last_esc  = 0.0
-        self._group_open: dict[str, int] = {}  # klucz_grupy → 0–100
-        self._dims_level = 0   # 0=off, 1=wymiary, 2=wymiary+otwory
+        self._group_open: dict[str, int] = {}  # group_key → 0–100
+        self._dims_level = 0   # 0=off, 1=dimensions, 2=dimensions+holes
 
         self.gl = GLWidget()
         self.setCentralWidget(self.gl)
 
-        # Overlay wymiarów – lewy górny narożnik
+        # Dimensions overlay — top-right corner
         self._info = QLabel(self)
         self._info.setStyleSheet(
             "color: #eee; background: rgba(0,0,0,160);"
@@ -617,7 +617,7 @@ class MainWindow(QMainWindow):
         margin = 10
         self._info.move(self.width() - self._info.width() - margin, margin)
 
-    # ── Skróty klawiaturowe ───────────────────────────────────────────────────
+    # ── Keyboard shortcuts ────────────────────────────────────────────────────
 
     def _setup_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=QApplication.quit)
@@ -629,7 +629,7 @@ class MainWindow(QMainWindow):
         mod = e.modifiers()
         Key = Qt.Key
 
-        # Wyjście
+        # Quit
         if k == Key.Key_Escape:
             now = time.monotonic()
             if now - self._last_esc < 1.0:
@@ -637,29 +637,29 @@ class MainWindow(QMainWindow):
             self._last_esc = now
             return
 
-        # Pomoc
+        # Help
         if k == Key.Key_H:
             HelpDialog(self).show(); return
 
-        # Perspektywa / ortho
+        # Perspective / ortho
         if k == Key.Key_P:
             self.gl.toggle_perspective(); return
 
-        # Wymiary wybranego elementu
+        # Dimensions of selected board
         if k == Key.Key_N:
             self._cycle_dims(); return
 
-        # Reset widoku
+        # Reset view
         if k == Key.Key_Home:
             self.gl.reset_view(); return
 
-        # Szuflada: + / -  (wszystkie grupy jednocześnie)
+        # Drawers: + / - (all groups simultaneously)
         if k in (Key.Key_Plus, Key.Key_Equal):
             self._adjust_all(+5); return
         if k == Key.Key_Minus:
             self._adjust_all(-5); return
 
-        # Strzałki
+        # Arrow keys
         if k not in (Key.Key_Left, Key.Key_Right, Key.Key_Up, Key.Key_Down):
             super().keyPressEvent(e); return
 
@@ -670,13 +670,13 @@ class MainWindow(QMainWindow):
             elif k == Key.Key_Down:
                 self.gl.zoom = max(self.gl.zoom * (1 - ZOOM_STEP), 0.05)
         elif mod & Qt.KeyboardModifier.ShiftModifier:
-            # Shift+Strzałki → obrót
+            # Shift+arrows → rotate
             if k == Key.Key_Left:  self.gl.rot_y -= ROT_STEP
             if k == Key.Key_Right: self.gl.rot_y += ROT_STEP
             if k == Key.Key_Up:    self.gl.rot_x -= ROT_STEP
             if k == Key.Key_Down:  self.gl.rot_x += ROT_STEP
         else:
-            # Strzałki → pan (scena jedzie w kierunku strzałki)
+            # Arrows → pan
             step = PAN_STEP
             if k == Key.Key_Left:  self.gl.pan_x += step
             if k == Key.Key_Right: self.gl.pan_x -= step
@@ -685,7 +685,7 @@ class MainWindow(QMainWindow):
 
         self.gl.update()
 
-    # ── Wymiary ───────────────────────────────────────────────────────────────
+    # ── Dimensions overlay ────────────────────────────────────────────────────
 
     def _cycle_dims(self):
         self._dims_level = (self._dims_level + 1) % 3
@@ -696,17 +696,17 @@ class MainWindow(QMainWindow):
             self._info.hide(); return
         sel = self.gl._selected
         if sel is None:
-            self._info.setText("  (kliknij element aby zobaczyć wymiary)")
+            self._info.setText("  (click a board to see dimensions)")
         else:
             self._info.setText(_board_info_text(self.gl.model.boards[sel], self._dims_level))
         self._reposition_info()
         self._info.show()
 
-    # ── Plik ──────────────────────────────────────────────────────────────────
+    # ── File ──────────────────────────────────────────────────────────────────
 
     def _open_file(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Otwórz model mebla",
+            self, "Open furniture model",
             str(Path(self._yaml_path).parent),
             "YAML (*.yaml *.yml)",
         )
@@ -729,7 +729,7 @@ class MainWindow(QMainWindow):
             self.gl.load_model(model)
             self.setWindowTitle(f"Meblarz — {Path(path).name}")
         except Exception as exc:
-            QMessageBox.critical(self, "Błąd wczytywania", str(exc))
+            QMessageBox.critical(self, "Load error", str(exc))
 
     def _toggle_group(self, key: str):
         cur = self._group_open.get(key, 0)

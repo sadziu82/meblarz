@@ -1,0 +1,71 @@
+# Drawer slide database
+# Reference a specific model in a drawer YAML: slides.model: <id>
+
+slides:
+
+  # ── GTV Ball-bearing slide H53 ───────────────────────────────────────────────
+  # Source: Karta_produktowa_PL-EN-RU__2021_65.pdf
+  # Use: deep drawers (>600mm), load up to 100kg
+  GTV-H53:
+    name: "GTV Ball-bearing slide H53"
+    manufacturer: GTV
+    symbol: PK-0-H53
+    height_mm: 53
+    side_clearance_mm: 19.5    # per side; box_W = niche_W − 2×19.5
+    load_capacity_kg: 100
+    extension: full
+    rear_clearance_mm: 20
+    available_lengths_mm:      # NL every 50mm, range 300–1100
+      - 300
+      - 350
+      - 400
+      - 450
+      - 500
+      - 550
+      - 600
+      - 650
+      - 700
+      - 750
+      - 800
+      - 850
+      - 900
+      - 950
+      - 1000
+      - 1050
+      - 1100
+    # Inner drawer: SKL = NL — box depth equals slide NL
+    inner_drawer_mount:
+      # Mounting hole positions on the CARCASS side (from back edge toward front)
+      # First position: 35mm from edge, then per spacing pattern
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [128, 96, 96, 96, 96, 64, 96, 96, 96, 96, 96, 96, 96]
+      carcass_hole_diameter_mm: 5.8
+      box_hole_diameter_mm: 5.6
+      hole_depth_mm: 3
+
+  # ── GTV Ball-bearing slide H45 (standard, light-duty) ───────────────────────
+  # Placeholder — fill in from product datasheet
+  GTV-H45:
+    name: "GTV Ball-bearing slide H45"
+    manufacturer: GTV
+    symbol: PK-0-H45
+    height_mm: 45
+    side_clearance_mm: 12.5
+    load_capacity_kg: 45
+    extension: full
+    rear_clearance_mm: 20
+    available_lengths_mm:
+      - 250
+      - 300
+      - 350
+      - 400
+      - 450
+      - 500
+      - 550
+      - 600
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 37
+      spacing_pattern_mm: [96, 96, 96, 96, 96, 96]
+      carcass_hole_diameter_mm: 5.0
+      box_hole_diameter_mm: 5.0
+      hole_depth_mm: 3

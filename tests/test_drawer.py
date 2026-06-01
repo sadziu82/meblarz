@@ -1,16 +1,16 @@
 """
-Testy jednostkowe weryfikujące zasady projektowania szuflady wewnętrznej.
-Reguły wg docs/reguly_projektowania.md (numery reguł podane w docstrings).
+Unit tests verifying inner-drawer design rules.
+Rules from docs/design_rules.md (rule numbers in docstrings).
 """
 from pathlib import Path
 import pytest
 
-from elementy.szuflada import load_drawer, _joint_positions, _select_nl
+from parts.drawer import load_drawer, _joint_positions, _select_nl
 
 
-YAML_PATH = str(Path(__file__).parent.parent / 'projekty' / 'szuflada.yaml')
+YAML_PATH = str(Path(__file__).parent.parent / 'projects' / 'drawer.yaml')
 
-# ── Wartości oczekiwane dla szuflada.yaml (410×420×1000mm, GTV-H53) ───────────
+# ── Expected values for drawer.yaml (410×420×1000mm, GTV-H53) ─────────────────
 NW, NH, ND  = 410, 420, 1000
 MDF         = 18
 BOT         = 18
