@@ -36,7 +36,7 @@ drawers:
   heights: [380, 380, 180]   # wysokości frontów od dołu do góry [mm]
 
 slides:
-  model: GTV-H45              # głębokość 460mm < 600mm → standardowa prowadnica
+  model: GTV-H53              # głębokość 460mm < 600mm → standardowa prowadnica
 
 front:
   inset:      1.5   # cofnięcie frontów względem lica korpusu [mm]

@@ -332,7 +332,7 @@ class GLWidget(QOpenGLWidget):
             if not b.movable:
                 return 0.0
             key = self._board_group_keys[_bidx[id(b)]]
-            return self.model.max_travel * self._open_per_group.get(key, 0.0)
+            return self.model.max_travel * self._open_per_group.get(key, 0.0) * b.move_fraction
 
         def draw_body(b, alpha):
             r, g, bv, _ = b.color
@@ -550,8 +550,8 @@ class GLWidget(QOpenGLWidget):
         best_t, best_i = np.inf, None
         for i, b in enumerate(self.model.boards):
             if b.movable:
-                key = self._board_group_keys[i]
-                trvl = self.model.max_travel * self._open_per_group.get(key, 0.0)
+                key  = self._board_group_keys[i]
+                trvl = self.model.max_travel * self._open_per_group.get(key, 0.0) * b.move_fraction
             else:
                 trvl = 0.0
             bmin = np.array([b.pos[0],        b.pos[1]-trvl,         b.pos[2]])

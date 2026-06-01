@@ -78,6 +78,7 @@ def _rename_drawer(boards: list[Board],
                 for jh in b.joint_holes
             ],
             movable=b.movable,
+            move_fraction=b.move_fraction,
         ))
     renamed_joints = [(name_map[a], name_map[b]) for a, b in joints]
     return renamed, renamed_joints
@@ -329,6 +330,25 @@ def load_dresser(path: str) -> DrawerModel:
 
         prefix = f'drawer_{i}_'
         drawer_boards, drawer_joints = _rename_drawer(drawer_boards, drawer_joints, prefix)
+
+        # ── Carcass slide mounting holes (same Y/Z as the drawer box holes) ──
+        mount = slide_cfg['inner_drawer_mount']
+        carcass_diam  = mount['carcass_hole_diameter_mm']
+        carcass_depth = mount['hole_depth_mm']
+        for b in drawer_boards:
+            if b.name == f'{prefix}side_left':
+                for h in b.holes:
+                    side_l.holes.append(Hole(
+                        x=thick, y=h.y, z=h.z,
+                        diameter=carcass_diam, depth=carcass_depth,
+                        direction='+x',  # inner face of left carcass side
+                    ))
+                    side_r.holes.append(Hole(
+                        x=carcass_w - thick, y=h.y, z=h.z,
+                        diameter=carcass_diam, depth=carcass_depth,
+                        direction='-x',  # inner face of right carcass side
+                    ))
+                break
 
         all_boards.extend(drawer_boards)
         all_joints.extend(drawer_joints)

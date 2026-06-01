@@ -58,8 +58,8 @@ def bd(model):
 class TestBoardInventory:
 
     def test_total_board_count(self, model):
-        """3 cokoł + 4 korpus + (N-1) poprzeczki + N×5 szuflady."""
-        expected = 3 + 4 + (N_DRAW - 1) + N_DRAW * 5
+        """3 plinth + 4 carcass + (N-1) rails + N×(5 structural + 6 slide) drawers."""
+        expected = 3 + 4 + (N_DRAW - 1) + N_DRAW * 11
         assert len(model.boards) == expected
 
     def test_drawer_count(self, model):
@@ -371,9 +371,9 @@ class TestRailJoints:
 class TestDrawers:
 
     def test_all_drawers_have_correct_box_width(self, bd):
-        """Zewnętrzna szerokość skrzynki = int_W − 2×luz_boczny (reguła 13)."""
-        # GTV-H45: luz_boczny=12.5
-        slide_side = 12.5
+        """Box external width = int_W − 2×slide_clearance (rule 13)."""
+        # GTV-H53 (1100mm deep dresser): side_clearance_mm=19.5
+        slide_side = 19.5
         expected_box_W = INT_W - 2 * slide_side
         for i in range(N_DRAW):
             assert bd[f'drawer_{i}_bottom'].width == pytest.approx(expected_box_W), (
@@ -450,7 +450,7 @@ class TestDrawers:
 class TestSlides:
 
     def test_slide_model(self, model):
-        assert model.slide_model == 'GTV-H45'
+        assert model.slide_model == 'GTV-H53'  # 1100mm depth → heavy-duty (rule 27)
 
     def test_slide_mount_50mm_from_bottom(self, bd):
         """Otwory montażowe 50mm od spodu dna szuflady (reguła 29)."""

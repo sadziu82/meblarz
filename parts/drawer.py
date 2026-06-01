@@ -43,7 +43,8 @@ class Board:
     color: Tuple[float, float, float, float] = (0.8, 0.65, 0.45, 1.0)
     holes: List[Hole] = field(default_factory=list)
     joint_holes: List[JointHole] = field(default_factory=list)
-    movable: bool = True  # False = carcass board (does not move on open)
+    movable: bool = True        # False = carcass board (does not move on open)
+    move_fraction: float = 1.0  # 0.0=fixed, 0.5=half-extension, 1.0=full (slide middle runner)
 
 
 @dataclass
@@ -281,6 +282,32 @@ def _build_drawer(
         bd['bottom'].joint_holes.append(JH(xp, bottom_y, bottom_z_center, '-y', 2, 'front', 'dowel'))
     joints.append(('front', 'bottom'))
 
+    # ── Slide body visualisation (3-part: outer / middle / inner) ────────────
+    height_mm = slide_cfg.get('height_mm', 45)
+    part_w    = slide_side / 3.0
+    _c = [
+        (0.50, 0.53, 0.58, 1.0),  # outer — dark steel (fixed, on carcass)
+        (0.62, 0.65, 0.70, 1.0),  # middle (half-extension)
+        (0.72, 0.75, 0.80, 1.0),  # inner — light steel (moves with drawer)
+    ]
+    _f = [0.0, 0.5, 1.0]
+    for k in range(3):
+        boards.append(Board(
+            name=f'slide_left_{"outer middle inner".split()[k]}',
+            width=part_w, height=height_mm, depth=float(nl),
+            pos=(k * part_w, box_start_y, slide_z_abs),
+            color=_c[k], movable=(_f[k] > 0.0), move_fraction=_f[k],
+        ))
+    right_x0 = box_start_x + box_W_ext
+    for k in range(3):
+        # Right side mirrors left: inner is closest to the drawer box (k=0)
+        boards.append(Board(
+            name=f'slide_right_{"inner middle outer".split()[k]}',
+            width=part_w, height=height_mm, depth=float(nl),
+            pos=(right_x0 + k * part_w, box_start_y, slide_z_abs),
+            color=_c[2 - k], movable=(_f[2 - k] > 0.0), move_fraction=_f[2 - k],
+        ))
+
     return boards, joints, nl
 
 
@@ -299,6 +326,7 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
                                    jh.direction, jh.element, jh.partner, jh.hole_type)
                          for jh in b.joint_holes],
             movable=b.movable,
+            move_fraction=b.move_fraction,
         ))
     return result
 
