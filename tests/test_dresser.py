@@ -452,16 +452,21 @@ class TestSlides:
     def test_slide_model(self, model):
         assert model.slide_model == 'GTV-H53'  # 1100mm depth → heavy-duty (rule 27)
 
-    def test_slide_mount_50mm_from_bottom(self, bd):
-        """Otwory montażowe 50mm od spodu dna szuflady (reguła 29)."""
+    def test_slide_mount_z_at_slide_centre(self, bd):
+        """Mounting holes at slide centre height: bottom+50+height_mm/2 (rule 30)."""
+        from parts.drawer import _load_slides_db
+        slide_h  = _load_slides_db()['GTV-H53']['height_mm']
+        expected = 50.0 + slide_h / 2
         for i in range(N_DRAW):
             bottom = bd[f'drawer_{i}_bottom']
             for side_name in (f'drawer_{i}_side_left', f'drawer_{i}_side_right'):
                 side = bd[side_name]
-                assert side.holes, f"{side_name}: brak otworów montażowych"
+                assert side.holes, f"{side_name}: no slide mounting holes"
                 for h in side.holes:
                     z_from_bottom = h.z - bottom.pos[2]
-                    assert z_from_bottom == pytest.approx(50.0)
+                    assert z_from_bottom == pytest.approx(expected), (
+                        f"{side_name}: hole z={z_from_bottom:.1f}, expected {expected}"
+                    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

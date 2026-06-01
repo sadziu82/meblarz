@@ -178,7 +178,9 @@ def _build_drawer(
     rear_y = box_start_y + box_depth - mdf
     rear_z = side_z
 
-    slide_z_abs = bottom_z + 50.0
+    height_mm    = slide_cfg.get('height_mm', 45)
+    slide_bot_z  = bottom_z + 50.0               # slide bottom (rule 30)
+    slide_hole_z = slide_bot_z + height_mm / 2   # mounting hole axis = centre of slide
     holes_y = _mount_holes_y(slide_cfg, nl, box_start_y)
 
     boards: list[Board] = []
@@ -206,7 +208,7 @@ def _build_drawer(
     )
     for hy in holes_y:
         left.holes.append(Hole(
-            x=box_start_x, y=hy, z=slide_z_abs,
+            x=box_start_x, y=hy, z=slide_hole_z,
             diameter=hole_d, depth=hole_dep, direction='-x',
         ))
     boards.append(left)
@@ -219,7 +221,7 @@ def _build_drawer(
     )
     for hy in holes_y:
         right.holes.append(Hole(
-            x=right_x + mdf, y=hy, z=slide_z_abs,
+            x=right_x + mdf, y=hy, z=slide_hole_z,
             diameter=hole_d, depth=hole_dep, direction='+x',
         ))
     boards.append(right)
@@ -283,8 +285,7 @@ def _build_drawer(
     joints.append(('front', 'bottom'))
 
     # ── Slide body visualisation (3-part: outer / middle / inner) ────────────
-    height_mm = slide_cfg.get('height_mm', 45)
-    part_w    = slide_side / 3.0
+    part_w = slide_side / 3.0
     _c = [
         (0.50, 0.53, 0.58, 1.0),  # outer — dark steel (fixed, on carcass)
         (0.62, 0.65, 0.70, 1.0),  # middle (half-extension)
@@ -295,7 +296,7 @@ def _build_drawer(
         boards.append(Board(
             name=f'slide_left_{"outer middle inner".split()[k]}',
             width=part_w, height=height_mm, depth=float(nl),
-            pos=(k * part_w, box_start_y, slide_z_abs),
+            pos=(k * part_w, box_start_y, slide_bot_z),
             color=_c[k], movable=(_f[k] > 0.0), move_fraction=_f[k],
         ))
     right_x0 = box_start_x + box_W_ext
@@ -304,7 +305,7 @@ def _build_drawer(
         boards.append(Board(
             name=f'slide_right_{"inner middle outer".split()[k]}',
             width=part_w, height=height_mm, depth=float(nl),
-            pos=(right_x0 + k * part_w, box_start_y, slide_z_abs),
+            pos=(right_x0 + k * part_w, box_start_y, slide_bot_z),
             color=_c[2 - k], movable=(_f[2 - k] > 0.0), move_fraction=_f[2 - k],
         ))
 

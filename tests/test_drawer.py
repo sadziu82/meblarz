@@ -604,16 +604,20 @@ class TestSlideMount:
         """NL prowadnicy prawidłowo dobrane."""
         assert model.slide_nl == NL
 
-    def test_slide_mount_z_50mm_from_bottom(self, bd):
-        """Otwory montażowe na boku: spód prowadnicy 50mm od spodu dna (reguła 29)."""
+    def test_slide_mount_z_at_slide_centre(self, bd):
+        """Mounting holes at slide centre height: bottom+50+height_mm/2 (rule 30)."""
+        # GTV-H53: height_mm=53 → hole at 50 + 53/2 = 76.5mm above box bottom
+        from parts.drawer import _load_slides_db
+        slide_h = _load_slides_db()['GTV-H53']['height_mm']
+        expected_z = 50.0 + slide_h / 2
         bottom = bd['bottom']
         for side_name in ('side_left', 'side_right'):
             side = bd[side_name]
-            assert side.holes, f"{side_name}: brak otworów montażowych prowadnicy"
+            assert side.holes, f"{side_name}: no slide mounting holes"
             for hole in side.holes:
                 z_from_bottom = hole.z - bottom.pos[2]
-                assert z_from_bottom == pytest.approx(50.0), (
-                    f"{side_name}: wysokość montażu = {z_from_bottom}mm, oczekiwano 50mm"
+                assert z_from_bottom == pytest.approx(expected_z), (
+                    f"{side_name}: hole z={z_from_bottom:.1f}mm, expected {expected_z}mm"
                 )
 
     def test_slide_holes_within_nl_range(self, model, bd):
