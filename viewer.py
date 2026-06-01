@@ -16,20 +16,54 @@ Skróty klawiaturowe:
 """
 
 import sys
+import re
 import math
 import time
 from pathlib import Path
 
 import numpy as np
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QFileDialog, QMessageBox,
+    QDialog, QVBoxLayout, QLabel,
+)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtGui import QSurfaceFormat, QKeySequence, QShortcut
+from PyQt6.QtGui import QSurfaceFormat, QKeySequence, QShortcut, QFont
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+import yaml as _yaml
 from elementy.szuflada import DrawerModel, Board, Hole, JointHole, load_drawer
+from elementy.komoda import load_komoda
+
+
+def _load_config() -> dict:
+    path = Path(__file__).parent / 'config.yaml'
+    try:
+        with open(path) as f:
+            return _yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        return {}
+
+
+def _cfg(key: str, default):
+    """Pobiera zagnieżdżoną wartość z configa, np. 'animacja.czas'."""
+    node = _CFG
+    for k in key.split('.'):
+        if not isinstance(node, dict) or k not in node:
+            return default
+        node = node[k]
+    return node
+
+
+_CFG = _load_config()
+
+
+def _movable_group(board: Board) -> str:
+    """Zwraca klucz grupy ruchomej (np. 'drawer_0') lub 'default' dla wolnostojącej szuflady."""
+    m = re.match(r'^(drawer_\d+)_', board.name)
+    return m.group(1) if m else 'default'
 
 
 def _ray_aabb(ro, rd, bmin, bmax):
@@ -52,9 +86,89 @@ def _ray_aabb(ro, rd, bmin, bmax):
 
 # ── Stałe sterowania ──────────────────────────────────────────────────────────
 
-PAN_STEP  = 15.0   # mm
-ROT_STEP  = 4.0    # stopnie
-ZOOM_STEP = 0.12   # mnożnik
+PAN_STEP       = _cfg('sterowanie.krok_przesuwania',  15.0)
+ROT_STEP       = _cfg('sterowanie.krok_obrotu',      4.0)
+ZOOM_STEP      = _cfg('sterowanie.krok_zoomu',       0.12)
+ANIM_DURATION  = _cfg('animacja.czas',               1.0)
+ANIM_FPS       = _cfg('animacja.fps',                60)
+ALPHA_INACTIVE = _cfg('przezroczystosc.nieaktywne',  0.15)
+ALPHA_SELECTED = _cfg('przezroczystosc.zaznaczone',  0.50)
+
+
+# ── Okno pomocy ───────────────────────────────────────────────────────────────
+
+_SHORTCUTS = [
+    ("Widok", [
+        ("Home",            "reset widoku"),
+        ("P",               "przełącz perspektywę / ortho"),
+        ("Shift + ←→↑↓",   "obracanie"),
+        ("↑↓←→",           "przesuwanie (pan)"),
+        ("Ctrl + ↑ / ↓",   "zoom in / out"),
+        ("Kółko myszy",     "zoom"),
+        ("N",               "wymiary zaznaczonego (kolejne: +otwory)"),
+    ]),
+    ("Mysz", [
+        ("Lewy drag",          "obracanie"),
+        ("Prawy drag",         "przesuwanie (blokada osi)"),
+        ("Lewy klik",          "zaznaczenie elementu"),
+        ("Ctrl + lewy klik",   "otwórz / zamknij element ruchomy"),
+    ]),
+    ("Szuflada", [
+        ("+ / -",           "otwieranie / zamykanie"),
+    ]),
+    ("Plik", [
+        ("Ctrl+O",          "otwórz plik YAML"),
+        ("Ctrl+R",          "przeładuj bieżący plik"),
+    ]),
+    ("Aplikacja", [
+        ("H",               "ta pomoc"),
+        ("2 × Esc / Ctrl+Q","wyjście"),
+    ]),
+]
+
+class HelpDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Skróty klawiaturowe")
+        self.setModal(False)
+        self.setMinimumWidth(400)
+
+        self.setStyleSheet("""
+            QDialog        { background: #232328; color: #ddd; }
+            QLabel.header  { color: #8ab4f8; font-weight: bold; margin-top: 8px; }
+            QLabel.row     { font-family: monospace; color: #ddd; padding: 1px 0; }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(2)
+        layout.setContentsMargins(18, 14, 18, 14)
+
+        title = QLabel("Skróty klawiaturowe")
+        f = QFont(); f.setPointSize(12); f.setBold(True)
+        title.setFont(f)
+        title.setStyleSheet("color: #fff; margin-bottom: 6px;")
+        layout.addWidget(title)
+
+        for section, rows in _SHORTCUTS:
+            hdr = QLabel(section)
+            hdr.setProperty("class", "header")
+            hdr.setStyleSheet("color: #8ab4f8; font-weight: bold; margin-top: 8px;")
+            layout.addWidget(hdr)
+            for key, desc in rows:
+                lbl = QLabel(f"  {key:<22} {desc}")
+                lbl.setProperty("class", "row")
+                lbl.setStyleSheet("font-family: monospace; color: #ddd; padding: 1px 0;")
+                layout.addWidget(lbl)
+
+        hint = QLabel("Zamknij: Esc")
+        hint.setStyleSheet("color: #888; margin-top: 10px; font-size: 10pt;")
+        layout.addWidget(hint)
+
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(e)
 
 
 # ── OpenGL widget ─────────────────────────────────────────────────────────────
@@ -65,36 +179,81 @@ class GLWidget(QOpenGLWidget):
         self.model: DrawerModel | None = None
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self.rot_x = 25.0
-        self.rot_y = -35.0
-        self.zoom  = 1.0
+        self.rot_x = _cfg('widok_startowy.obrot_x', 25.0)
+        self.rot_y = _cfg('widok_startowy.obrot_y', -35.0)
+        self.zoom  = _cfg('widok_startowy.zoom',    1.0)
         self.pan_x = 0.0
         self.pan_z = 0.0
 
         self._last_pos  = None
         self._press_pos = None
         self._pan_axis: str | None = None
-        self._open      = 0.0
-        self._scene_size = 500.0
+        self._open_per_group: dict[str, float] = {}
+        self._board_group_keys: list[str] = []
+        self._anim_targets: dict[str, float] = {}                   # grupa → cel (0.0–1.0)
+        self._anim_start: dict[str, tuple[float, float]] = {}       # grupa → (wartość_startowa, czas)
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(1000 // ANIM_FPS)
+        self._anim_timer.timeout.connect(self._anim_tick)
+        self._scene_size  = 500.0
         self._selected: int | None = None
         self._mv_mat   = None
         self._proj_mat = None
         self._viewport = None
+        self._perspective    = True
 
     # ── API ───────────────────────────────────────────────────────────────────
 
-    def set_open(self, v: float):
-        self._open = v
+    def set_open_group(self, key: str, v: float, _repaint: bool = True):
+        self._anim_targets.pop(key, None)
+        self._anim_start.pop(key, None)
+        self._open_per_group[key] = max(0.0, min(1.0, v))
+        if _repaint:
+            self.update()
+
+    def animate_group(self, key: str, target: float):
+        cur = self._open_per_group.get(key, 0.0)
+        if abs(cur - target) < 1e-4:
+            return
+        self._anim_targets[key] = max(0.0, min(1.0, target))
+        self._anim_start[key]   = (cur, time.monotonic())
+        if not self._anim_timer.isActive():
+            self._anim_timer.start()
+
+    def _anim_tick(self):
+        now  = time.monotonic()
+        done = []
+        for key, target in self._anim_targets.items():
+            start_val, start_time = self._anim_start[key]
+            t = min((now - start_time) / ANIM_DURATION, 1.0)
+            # smoothstep ease-in-out
+            eased = t * t * (3.0 - 2.0 * t)
+            self._open_per_group[key] = start_val + (target - start_val) * eased
+            if t >= 1.0:
+                self._open_per_group[key] = target
+                done.append(key)
+        for key in done:
+            del self._anim_targets[key]
+            del self._anim_start[key]
+        if not self._anim_targets:
+            self._anim_timer.stop()
         self.update()
 
     def reset_view(self):
-        self.rot_x = 25.0; self.rot_y = -35.0
-        self.zoom  = 1.0;  self.pan_x = 0.0; self.pan_z = 0.0
+        self.rot_x = _cfg('widok_startowy.obrot_x', 25.0)
+        self.rot_y = _cfg('widok_startowy.obrot_y', -35.0)
+        self.zoom  = _cfg('widok_startowy.zoom',    1.0)
+        self.pan_x = 0.0; self.pan_z = 0.0
         self.update()
 
     def load_model(self, model: DrawerModel):
         self.model = model
         self._selected = None
+        self._board_group_keys = [_movable_group(b) for b in model.boards]
+        self._open_per_group = {}
+        self._anim_targets.clear()
+        self._anim_start.clear()
+        self._anim_timer.stop()
         if model.boards:
             xs = [b.pos[0] for b in model.boards] + [b.pos[0]+b.width  for b in model.boards]
             ys = [b.pos[1] for b in model.boards] + [b.pos[1]+b.depth  for b in model.boards]
@@ -115,13 +274,27 @@ class GLWidget(QOpenGLWidget):
         glLightfv(GL_LIGHT0, GL_AMBIENT,  [0.30, 0.30, 0.30, 1.0])
         glClearColor(0.18, 0.18, 0.22, 1.0)
 
+    def toggle_perspective(self):
+        self._perspective = not self._perspective
+        self.update()
+
     def resizeGL(self, w, h):
         glViewport(0, 0, w, max(h, 1))
+
+    def _update_projection(self):
+        w, h = self.width(), self.height()
+        aspect = w / max(h, 1)
+        dist   = self._scene_size * 2.5 / self.zoom
         glMatrixMode(GL_PROJECTION); glLoadIdentity()
-        gluPerspective(45.0, w / max(h, 1), 1.0, 10000.0)
+        if self._perspective:
+            gluPerspective(45.0, aspect, 1.0, 10000.0)
+        else:
+            s = dist * math.tan(math.radians(22.5))
+            glOrtho(-s * aspect, s * aspect, -s, s, -10000.0, 10000.0)
         glMatrixMode(GL_MODELVIEW)
 
     def paintGL(self):
+        self._update_projection()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         dist = self._scene_size * 2.5 / self.zoom
@@ -141,22 +314,28 @@ class GLWidget(QOpenGLWidget):
     # ── Rysowanie modelu ──────────────────────────────────────────────────────
 
     def _draw_model(self):
-        travel   = self.model.max_travel * self._open
         sel      = self._selected
         boards   = self.model.boards
         sel_name = boards[sel].name if sel is not None else None
+        _bidx    = {id(b): i for i, b in enumerate(boards)}
+
+        def _t(b):
+            if not b.movable:
+                return 0.0
+            key = self._board_group_keys[_bidx[id(b)]]
+            return self.model.max_travel * self._open_per_group.get(key, 0.0)
 
         def draw_body(b, alpha):
             r, g, bv, _ = b.color
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - travel, b.pos[2])
+            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
             glColor4f(r, g, bv, alpha)
             self._draw_box(b.width, b.depth, b.height)
             glPopMatrix()
 
         def draw_slide_holes(b):
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - travel, b.pos[2])
+            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
             for h in b.holes:
                 glPushMatrix()
                 glTranslatef(h.x - b.pos[0], h.y - b.pos[1], h.z - b.pos[2])
@@ -166,7 +345,7 @@ class GLWidget(QOpenGLWidget):
 
         def draw_joint_holes(b, filter_partner=None):
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - travel, b.pos[2])
+            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
             for jh in b.joint_holes:
                 if filter_partner is not None and jh.partner != filter_partner:
                     continue
@@ -190,8 +369,8 @@ class GLWidget(QOpenGLWidget):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             glDepthMask(GL_FALSE)
             for i in others:
-                draw_body(boards[i], 0.15)
-            draw_body(boards[sel], 0.5)
+                draw_body(boards[i], ALPHA_INACTIVE)
+            draw_body(boards[sel], ALPHA_SELECTED)
             glDepthMask(GL_TRUE)
             glDisable(GL_BLEND)
             for b in boards:
@@ -328,34 +507,79 @@ class GLWidget(QOpenGLWidget):
         if e.button() == Qt.MouseButton.LeftButton and self._press_pos is not None:
             dp = e.position() - self._press_pos
             if dp.x()**2 + dp.y()**2 < 25:
-                self._pick(int(e.position().x()), int(e.position().y()))
+                px, py = int(e.position().x()), int(e.position().y())
+                if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                    idx = self._pick_idx(px, py)
+                    if idx is not None and self.model and self.model.boards[idx].movable:
+                        if isinstance(self.parent(), QMainWindow):
+                            self.parent()._toggle_group(self._board_group_keys[idx])
+                else:
+                    self._pick(px, py)
         self._last_pos = None; self._press_pos = None
 
-    def _pick(self, px, py):
+    def _pick_idx(self, px, py) -> "int | None":
         if self._mv_mat is None or not self.model:
-            return
+            return None
         py_gl = self.height() - py - 1
         near = gluUnProject(px, py_gl, 0.0, self._mv_mat, self._proj_mat, self._viewport)
         far  = gluUnProject(px, py_gl, 1.0, self._mv_mat, self._proj_mat, self._viewport)
         ro = np.array(near, dtype=float)
         rd = np.array(far,  dtype=float) - ro
         n  = np.linalg.norm(rd)
-        if n < 1e-9: return
+        if n < 1e-9:
+            return None
         rd /= n
-        travel = self.model.max_travel * self._open
         best_t, best_i = np.inf, None
         for i, b in enumerate(self.model.boards):
-            bmin = np.array([b.pos[0],        b.pos[1]-travel,         b.pos[2]])
-            bmax = np.array([b.pos[0]+b.width, b.pos[1]-travel+b.depth, b.pos[2]+b.height])
+            if b.movable:
+                key = self._board_group_keys[i]
+                trvl = self.model.max_travel * self._open_per_group.get(key, 0.0)
+            else:
+                trvl = 0.0
+            bmin = np.array([b.pos[0],        b.pos[1]-trvl,         b.pos[2]])
+            bmax = np.array([b.pos[0]+b.width, b.pos[1]-trvl+b.depth, b.pos[2]+b.height])
             t = _ray_aabb(ro, rd, bmin, bmax)
             if t is not None and t < best_t:
                 best_t, best_i = t, i
+        return best_i
+
+    def _pick(self, px, py):
+        best_i = self._pick_idx(px, py)
         self._selected = None if best_i == self._selected else best_i
         self.update()
+        if isinstance(self.parent(), QMainWindow):
+            self.parent()._update_info()
 
     def wheelEvent(self, e):
         self.zoom *= 1.0 + e.angleDelta().y() / 1200.0
         self.zoom = max(0.05, min(self.zoom, 20.0)); self.update()
+
+
+# ── Info overlay ─────────────────────────────────────────────────────────────
+
+def _board_info_text(board: Board, level: int) -> str:
+    """Tekst wymiaru/otworów w lokalnym układzie (x=width, y=height, depth=Y)."""
+    lines = [
+        f"  {board.name}",
+        f"  {board.width:.1f} × {board.height:.1f} × {board.depth:.1f} mm",
+        f"  (szer × wys × grub)",
+    ]
+    if level >= 2 and (board.holes or board.joint_holes):
+        lines.append("")
+        lines.append("  Otwory (x, y od lewego dolnego):")
+        for h in board.holes:
+            lx = h.x - board.pos[0]
+            ly = h.z - board.pos[2]
+            lines.append(f"   prowadnica  x={lx:.1f}  y={ly:.1f}  ø{h.diameter:.1f}  głęb={h.depth:.1f}")
+        for jh in board.joint_holes:
+            lx = jh.x - board.pos[0]
+            ly = jh.z - board.pos[2]
+            ld = jh.y - board.pos[1]
+            label = "kołek" if jh.hole_type == 'dowel' else "konfirmat"
+            elem  = "e1" if jh.element == 1 else "e2"
+            depth_info = f"środek grub." if abs(ld - board.depth / 2) < 1.0 else f"głęb={ld:.1f}"
+            lines.append(f"   {label} ({elem}) → {jh.partner:<12} x={lx:.1f}  y={ly:.1f}  {depth_info}")
+    return "\n".join(lines)
 
 
 # ── Okno główne ───────────────────────────────────────────────────────────────
@@ -364,15 +588,34 @@ class MainWindow(QMainWindow):
     def __init__(self, yaml_path: str):
         super().__init__()
         self._yaml_path = yaml_path
-        self._last_esc  = 0.0       # czas ostatniego Escape
-        self._open_pct  = 0         # % otwarcia szuflady
+        self._last_esc  = 0.0
+        self._group_open: dict[str, int] = {}  # klucz_grupy → 0–100
+        self._dims_level = 0   # 0=off, 1=wymiary, 2=wymiary+otwory
 
         self.gl = GLWidget()
         self.setCentralWidget(self.gl)
 
+        # Overlay wymiarów – lewy górny narożnik
+        self._info = QLabel(self)
+        self._info.setStyleSheet(
+            "color: #eee; background: rgba(0,0,0,160);"
+            "padding: 8px; font-family: monospace; font-size: 10pt;"
+        )
+        self._info.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._info.hide()
+
         self._load(yaml_path)
         self.showMaximized()
         self._setup_shortcuts()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._reposition_info()
+
+    def _reposition_info(self):
+        self._info.adjustSize()
+        margin = 10
+        self._info.move(self.width() - self._info.width() - margin, margin)
 
     # ── Skróty klawiaturowe ───────────────────────────────────────────────────
 
@@ -394,15 +637,27 @@ class MainWindow(QMainWindow):
             self._last_esc = now
             return
 
+        # Pomoc
+        if k == Key.Key_H:
+            HelpDialog(self).show(); return
+
+        # Perspektywa / ortho
+        if k == Key.Key_P:
+            self.gl.toggle_perspective(); return
+
+        # Wymiary wybranego elementu
+        if k == Key.Key_N:
+            self._cycle_dims(); return
+
         # Reset widoku
         if k == Key.Key_Home:
             self.gl.reset_view(); return
 
-        # Szuflada: + / -
+        # Szuflada: + / -  (wszystkie grupy jednocześnie)
         if k in (Key.Key_Plus, Key.Key_Equal):
-            self._set_open(self._open_pct + 5); return
+            self._adjust_all(+5); return
         if k == Key.Key_Minus:
-            self._set_open(self._open_pct - 5); return
+            self._adjust_all(-5); return
 
         # Strzałki
         if k not in (Key.Key_Left, Key.Key_Right, Key.Key_Up, Key.Key_Down):
@@ -421,14 +676,31 @@ class MainWindow(QMainWindow):
             if k == Key.Key_Up:    self.gl.rot_x -= ROT_STEP
             if k == Key.Key_Down:  self.gl.rot_x += ROT_STEP
         else:
-            # Strzałki → pan
+            # Strzałki → pan (scena jedzie w kierunku strzałki)
             step = PAN_STEP
-            if k == Key.Key_Left:  self.gl.pan_x -= step
-            if k == Key.Key_Right: self.gl.pan_x += step
-            if k == Key.Key_Up:    self.gl.pan_z += step
-            if k == Key.Key_Down:  self.gl.pan_z -= step
+            if k == Key.Key_Left:  self.gl.pan_x += step
+            if k == Key.Key_Right: self.gl.pan_x -= step
+            if k == Key.Key_Up:    self.gl.pan_z -= step
+            if k == Key.Key_Down:  self.gl.pan_z += step
 
         self.gl.update()
+
+    # ── Wymiary ───────────────────────────────────────────────────────────────
+
+    def _cycle_dims(self):
+        self._dims_level = (self._dims_level + 1) % 3
+        self._update_info()
+
+    def _update_info(self):
+        if self._dims_level == 0 or not self.gl.model:
+            self._info.hide(); return
+        sel = self.gl._selected
+        if sel is None:
+            self._info.setText("  (kliknij element aby zobaczyć wymiary)")
+        else:
+            self._info.setText(_board_info_text(self.gl.model.boards[sel], self._dims_level))
+        self._reposition_info()
+        self._info.show()
 
     # ── Plik ──────────────────────────────────────────────────────────────────
 
@@ -446,18 +718,33 @@ class MainWindow(QMainWindow):
 
     def _load(self, path: str):
         try:
-            model = load_drawer(path)
+            with open(path) as f:
+                keys = _yaml.safe_load(f).keys()
+            if 'carcass' in keys:
+                model = load_komoda(path)
+            else:
+                model = load_drawer(path)
             self._yaml_path = path
-            self._open_pct  = 0
+            self._group_open = {}
             self.gl.load_model(model)
-            self.gl.set_open(0.0)
             self.setWindowTitle(f"Meblarz — {Path(path).name}")
         except Exception as exc:
             QMessageBox.critical(self, "Błąd wczytywania", str(exc))
 
-    def _set_open(self, pct: int):
-        self._open_pct = max(0, min(100, pct))
-        self.gl.set_open(self._open_pct / 100.0)
+    def _toggle_group(self, key: str):
+        cur = self._group_open.get(key, 0)
+        self._group_open[key] = 0 if cur > 50 else 100
+        self.gl.animate_group(key, self._group_open[key] / 100.0)
+
+    def _adjust_all(self, delta: int):
+        if not self.gl.model:
+            return
+        keys = {k for k, b in zip(self.gl._board_group_keys, self.gl.model.boards) if b.movable}
+        for key in keys:
+            pct = max(0, min(100, self._group_open.get(key, 0) + delta))
+            self._group_open[key] = pct
+            self.gl.set_open_group(key, pct / 100.0, _repaint=False)
+        self.gl.update()
 
 
 # ── Start ─────────────────────────────────────────────────────────────────────

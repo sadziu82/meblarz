@@ -47,8 +47,12 @@ def bd(model):
 class TestJointPositions:
 
     def test_short_edge_single_center_hole(self):
-        """Krawędź < 2×max_from_end → 1 otwór w środku."""
-        assert _joint_positions(0, 150) == [75]
+        """Krawędź < 40mm (za mało miejsca na 2 otwory) → 1 otwór w środku."""
+        assert _joint_positions(0, 30) == [15]
+
+    def test_150mm_edge_two_holes(self):
+        """Krawędź 150mm → 2 otwory w 1/4 i 3/4 (reguła 32: min 2)."""
+        assert _joint_positions(0, 150) == [38, 112]
 
     def test_length_200_two_holes(self):
         """Krawędź 200mm (= 2×100) → 2 otwory w 1/4 i 3/4."""

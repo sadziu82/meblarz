@@ -87,26 +87,79 @@
 
 ---
 
+## LOKALNY UKŁAD WSPÓŁRZĘDNYCH PŁYTY
+
+41. Pozycje otworów zawsze podawane w **lokalnym układzie współrzędnych** płyty, niezależnie od orientacji elementu w meblu:
+    - **x** — oś pozioma (wzdłuż szerokości płyty)
+    - **y** — oś pionowa (wzdłuż wysokości płyty)
+    - **głębokość** — zawsze grubość płyty; nie wpływa na położenie otworu w płaszczyźnie i nie jest podawana jako osobna współrzędna pozycji
+42. Otwory **w czole** (kołki, gwint konfirmatu wchodzący od czoła) leżą zawsze na środku grubości płyty. Pozycja podawana wyłącznie jako (x, y).
+43. Otwór w płaszczyźnie — pozycja jako (x, y) od lewego dolnego narożnika widocznej twarzy płyty.
+
+---
+
+## KORPUS SZAFKI
+
+### Konstrukcja i wymiary
+
+54. Klient podaje wymiary zewnętrzne mebla. **`carcass.height` to całkowita wysokość od podłogi do wierzchu, wliczając cokoł.** Wierzch i spód mają pełną szerokość zewnętrzną (`width`). Boki mieszczą się między nimi. Wymiary wewnętrzne: `int_W = width − 2×thickness`, `int_H = (height − plinth.height) − 2×thickness`, `int_D = depth`.
+55. Tył szafki z szufladami — **otwarty** (zasada 3). Nie stosować HDF przy szufladach.
+56. Typ szafki `placement` określa widoczność boków: `freestanding` — oba boki widoczne; `builtin_left/right` — jeden bok przy ścianie (niewidoczny); `builtin_both` — oba niewidoczne.
+
+### Połączenia korpusu
+
+57. Połączenia **wierzch ↔ boki** i **spód ↔ boki** — kierunek wiercenia zależy od typu połączenia:
+    - **Kołki** (bok widoczny): wierzch — otwór w płaszczyźnie od **spodniej ściany** (wewnątrz szafki); spód — otwór w płaszczyźnie od **górnej ściany** (wewnątrz szafki). Otwory w czołach boków naprzeciw.
+    - **Konfirmaty** (bok niewidoczny): wierzch — głowica na **górnej ścianie** (przykryta blatem/zabudową), wiercenie z góry w dół przez wierzch w czoło boku; spód — głowica na **dolnej ścianie** (pod szafką), wiercenie z dołu w górę przez spód w czoło boku.
+58. Połączenia **poprzeczki ↔ boki** — kierunek wiercenia zależy od widoczności boku:
+    - **Kołki** (bok widoczny): element 1 od **wewnętrznej** ściany boku (ukryta wewnątrz szafki), otwór w płaszczyźnie; element 2 — czoło poprzeczki.
+    - **Konfirmaty** (bok niewidoczny): element 1 od **zewnętrznej** ściany boku (przy ścianie budynku, niewidoczna), wiercenie przez bok w czoło poprzeczki; element 2 — czoło poprzeczki.
+59. Szafka kuchenna dolna (bez wierzchu, z poprzeczkami nośnymi) — osobny typ, osobne zasady.
+
+### Podział wysokości — szuflady z poprzeczkami
+
+60. Liczba poprzeczek między szufladami = `count − 1`. Każda poprzeczka ma szerokość `int_W` i głębokość wg specyfikacji (domyślnie 100mm).
+61. Sekwencja elementów od spodu do góry (dla każdej szuflady): `bottom_gap` (3mm) → front szuflady → `top_gap` (50mm, przerwa na palce) → poprzeczka (18mm) → … → front ostatniej szuflady → `top_gap` → spód wierzchu. Poprzeczka **nie** występuje po ostatniej (najwyższej) szufladzie.
+62. Wysokość frontu przy równym podziale (`distribution: equal`): `front_H = (int_H − (count−1)×rail_thickness − count×(top_gap + bottom_gap)) / count`. Wynik zaokrąglić w dół; nadmiarowe mm dodać do **najniższej** szuflady.
+63. Przy podziale niestandardowym (`distribution: custom`) — lista `heights` podana **od najniższej do najwyższej** szuflady. Można podać mniej wartości niż `count` — brakujące szuflady (najwyższe) wyliczane są jako równy podział pozostałej wysokości. Brakujące zawsze interpretowane jako `front_H`.
+64. Parametr `height_mode` (tylko przy `distribution: custom`) określa co oznaczają podane wysokości:
+    - `front` (domyślnie) — wysokość frontu szuflady.
+    - `niche` — wysokość wnęki: `front_H = h − top_gap − bottom_gap`.
+    - `interior` — maksymalna wysokość zawartości (= `side_H`): `front_H = ⌊3h/2⌋` (minimalne front_H dające `side_H ≥ h`).
+    - Aliasy numeryczne: `1` = `niche`, `2` = `interior`, `3` = `front`.
+
+### Poprzeczka z rowkiem LED
+
+65. Rowek na taśmę LED frezowany na **spodniej ścianie** poprzeczki, 20mm od przedniej krawędzi, wymiary 12×4mm. Rowek oświetla otwartą szufladę poniżej.
+66. Poprzeczka nie sięga pełnej głębokości korpusu — za nią pozostaje wolna przestrzeń. Głębokość domyślna: 100mm.
+
+### Cokoł
+
+67. Cokoł jest osobnym elementem montowanym pod spodem korpusu. `carcass.height` to całkowita wysokość mebla **wliczając cokoł** — wysokość korpusu bez cokołu = `height − plinth.height`. Parametry: `height` (domyślnie 100mm), `inset_front` (wcięcie od lica frontu, domyślnie 15mm), `inset_side` (wcięcie od boków, domyślnie 15mm). Wartość `height: 0` oznacza brak cokołu.
+68. Cokoł składa się z deski przedniej i dwóch desek bocznych (tył otwarty). Szerokość deski przedniej: `width − 2×inset_side`. Głębokość desek bocznych: `depth − inset_front − thickness`. *(Deski boczne zaczynają się za tylną ścianą deski przedniej.)* Połączenia: konfirmaty od zewnętrznej (dolnej) ściany cokołu — powierzchnia cokołu jest niewidoczna przy normalnym użytkowaniu.
+
+---
+
 ## ESTETYKA
 
-41. Elementy widoczne (fronty, boki zewnętrzne) — **nigdy** nie mają widocznych wierceń od strony zewnętrznej. Otwory tylko od strony wewnętrznej/niewidocznej.
-42. Front szuflady: otwory na kołki wyłącznie od strony skrzynki (tył frontu), wiercone w płaszczyźnie.
+44. Elementy widoczne (fronty, boki zewnętrzne) — **nigdy** nie mają widocznych wierceń od strony zewnętrznej. Otwory tylko od strony wewnętrznej/niewidocznej.
+45. Front szuflady: otwory na kołki wyłącznie od strony skrzynki (tył frontu), wiercone w płaszczyźnie.
 
 ---
 
 ## OPENSCAD
 
-43. Tylko **ASCII** w nazwach zmiennych i modułów. Polskie znaki tylko w komentarzach (`//`).
-44. Elementy estetyczne (fronty) modelować jako **osobne moduły** — nie zagnieżdżać w module skrzynki.
-45. Przed pisaniem kodu narysować przekrój — określić który element jest bazowy, które stoją na nim, które obejmują.
-46. Przy otworach łączących dwa elementy na różnych wysokościach Z — liczyć pozycję we **współrzędnych globalnych** (dodać offset między elementami).
-47. Kierunki rotacji cylindrów (domyślnie idą w `+Z`):
+46. Tylko **ASCII** w nazwach zmiennych i modułów. Polskie znaki tylko w komentarzach (`//`).
+47. Elementy estetyczne (fronty) modelować jako **osobne moduły** — nie zagnieżdżać w module skrzynki.
+48. Przed pisaniem kodu narysować przekrój — określić który element jest bazowy, które stoją na nim, które obejmują.
+49. Przy otworach łączących dwa elementy na różnych wysokościach Z — liczyć pozycję we **współrzędnych globalnych** (dodać offset między elementami).
+50. Kierunki rotacji cylindrów (domyślnie idą w `+Z`):
     - wiercenie w `+Y`: `rotate([-90,0,0])`
     - wiercenie w `-Y`: `rotate([90,0,0])`
     - wiercenie w `-Z`: `rotate([180,0,0])`
     - wiercenie w `+Z`: brak rotacji
-48. Otwory wiercone od powierzchni w głąb — cylinder startuje na powierzchni + **0.1mm** naddatku (żeby difference działał poprawnie).
-49. Dwa moduły dla otworów konfirmatów:
+51. Otwory wiercone od powierzchni w głąb — cylinder startuje na powierzchni + **0.1mm** naddatku (żeby difference działał poprawnie).
+52. Dwa moduły dla otworów konfirmatów:
     - `conf_hole()` — **pierwszy element**: pogłębienie ø11mm + otwór przelotowy ø5mm
     - `conf_hole_thread()` — **drugi element**: tylko otwór gwintowany ø5mm, głębokość 35mm
-50. Exploded view — każdy element odsunięty w naturalnym kierunku montażu (front w -Y, boki w ±X, tył w +Y, dno w -Z). Parametr `explode = 0/1` do przełączania.
+53. Exploded view — każdy element odsunięty w naturalnym kierunku montażu (front w -Y, boki w ±X, tył w +Y, dno w -Z). Parametr `explode = 0/1` do przełączania.

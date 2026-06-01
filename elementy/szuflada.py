@@ -43,6 +43,7 @@ class Board:
     color: Tuple[float, float, float, float] = (0.8, 0.65, 0.45, 1.0)
     holes: List[Hole] = field(default_factory=list)
     joint_holes: List[JointHole] = field(default_factory=list)
+    movable: bool = True  # False = element korpusu (nie przesuwa się przy otwarciu)
 
 
 @dataclass
@@ -52,7 +53,8 @@ class DrawerModel:
     max_travel: float = 0.0
     slide_model: str = ""
     slide_nl: int = 0
-    joints: List[Tuple[str, str]] = field(default_factory=list)  # (first_elem, second_elem)
+    joints: List[Tuple[str, str]] = field(default_factory=list)
+    drawer_count: int = 0  # 0 = samodzielna szuflada, >0 = komoda
 
 
 _SLIDES_DB: dict | None = None
@@ -69,21 +71,24 @@ def _load_slides_db() -> dict:
 def _joint_positions(start: float, length: float,
                      max_from_end: float = 100, max_spacing: float = 300) -> list[float]:
     """
-    Pozycje konfirmatów wzdłuż krawędzi (zasady 27/29):
-    1/4 i 3/4 długości, max 100mm od końca, jeśli odstęp >300mm – dodaj pośrednie.
+    Pozycje konfirmatów / kołków wzdłuż krawędzi (zasady 36/39):
+    1/4 i 3/4 długości, ale nie dalej niż max_from_end od końca.
+    Jeśli odstęp >300mm – dodaj pośrednie w równych odstępach.
     """
-    if length < 2 * max_from_end:
-        return [round(start + length / 2, 1)]
-    p1 = max(start + max_from_end, start + length * 0.25)
-    p2 = min(start + length - max_from_end, start + length * 0.75)
-    positions = sorted({round(p1, 1), round(p2, 1)})
+    # Pozycje liczone RELATIVE (od 0), zaokrąglone do mm, potem dodajemy start
+    # Próg 40mm: krótsza krawędź → 1 otwór w środku (zbyt mało miejsca na 2)
+    if length < 40:
+        return [start + round(length / 2)]
+    p1 = round(min(length * 0.25, max_from_end))
+    p2 = round(max(length * 0.75, length - max_from_end))
+    positions = sorted({p1, p2})
     i = 0
     while i < len(positions) - 1:
         if positions[i + 1] - positions[i] > max_spacing:
-            positions.insert(i + 1, round((positions[i] + positions[i + 1]) / 2, 1))
+            positions.insert(i + 1, round((positions[i] + positions[i + 1]) / 2))
         else:
             i += 1
-    return positions
+    return [start + p for p in positions]
 
 
 def _select_nl(available: list[int], max_depth: float) -> int:
@@ -99,8 +104,6 @@ def _select_nl(available: list[int], max_depth: float) -> int:
 def _mount_holes_y(slide_cfg: dict, nl: int, y_start: float) -> list[float]:
     """
     Generuje absolutne pozycje Y otworów montażowych prowadnicy na boku skrzynki.
-    Pozycje liczone od y_start (= przednia krawędź boku skrzynki).
-    Otwory wg schematu z karty produktowej – używane tylko te mieszczące się w NL.
     """
     mount = slide_cfg['montaz_szuflada_wewnetrzna']
     first = mount['pierwszy_otwor_od_krawedzi_mm']
@@ -116,65 +119,40 @@ def _mount_holes_y(slide_cfg: dict, nl: int, y_start: float) -> list[float]:
     return [y_start + p for p in positions]
 
 
-def load_drawer(path: str) -> DrawerModel:
-    with open(path) as f:
-        cfg = yaml.safe_load(f)
+def _build_drawer(
+    nw: float, front_H: float, nd: float,
+    mdf: float, bot: float,
+    slide_cfg: dict,
+    inset: float, side_gap: float, bot_gap: float,
+) -> tuple[list[Board], list[tuple[str, str]], int]:
+    """
+    Oblicza geometrię szuflady wewnętrznej.
+    Pozycje we współrzędnych niszy (lewy-przód-spód = 0,0,0).
+    front_H = wysokość frontu (już po odjęciu top_gap i bot_gap przez wywołującego).
+    Zwraca (boards, joints, nl).
+    """
+    slide_side = slide_cfg['luz_boczny_mm']
+    slide_rear = slide_cfg['luz_tylny_mm']
+    hole_d   = slide_cfg['montaz_szuflada_wewnetrzna']['srednica_otworow_skrzynka_mm']
+    hole_dep = slide_cfg['montaz_szuflada_wewnetrzna']['glebokos_otworow_mm']
 
-    nw = cfg['niche']['width']
-    nh = cfg['niche']['height']
-    nd = cfg['niche']['depth']
-
-    mdf = cfg['material']['thickness']
-    bot = cfg['material']['bottom_thickness']
-
-    # Wczytaj model prowadnicy z bazy
-    slide_model_id = cfg['slides']['model']
-    db = _load_slides_db()
-    if slide_model_id not in db:
-        raise ValueError(f"Nieznany model prowadnicy: '{slide_model_id}'. Dostępne: {list(db)}")
-    slide_cfg = db[slide_model_id]
-
-    slide_side = slide_cfg['luz_boczny_mm']       # luz z każdej strony (zasada 18)
-    slide_rear = slide_cfg['luz_tylny_mm']         # luz tylny (zasada 19)
-    hole_d     = slide_cfg['montaz_szuflada_wewnetrzna']['srednica_otworow_skrzynka_mm']
-    hole_dep   = slide_cfg['montaz_szuflada_wewnetrzna']['glebokos_otworow_mm']
-
-    top_gap  = cfg['front']['top_gap']
-    inset    = cfg['front']['inset']
-    side_gap = cfg['front']['side_gap']
-    bot_gap  = cfg['front']['bottom_gap']
-
-    # --- Front szuflady ---
-    front_W = nw - 2 * side_gap
-    front_H = nh - top_gap - bot_gap
     front_D = mdf
 
-    # --- Skrzynka szuflady ---
-    # box_W_ext = zasada 13: niche_W - 2*luz_boczny
     box_W_ext = nw - 2 * slide_side
-
-    # Maksymalna głębokość skrzynki przed doborem NL (zasada 14)
-    # Skrzynka zaczyna się za tylną ścianą frontu: front_D + inset
     max_box_depth = nd - (front_D + inset) - slide_rear
+    nl = _select_nl(slide_cfg['dostepne_dlugosci_mm'], max_box_depth)
+    box_depth = float(nl)
 
-    # Dobierz NL: szuflada wewnętrzna → SKL = NL (zasada z karty H53)
-    # Wybierz największe dostępne NL nieprzekraczające max_box_depth
-    available_nl = slide_cfg['dostepne_dlugosci_mm']
-    nl = _select_nl(available_nl, max_box_depth)
-    box_depth = float(nl)  # głębokość skrzynki = NL prowadnicy
-
-    # Wysokość boków = 2/3 wysokości frontu (zasada 6)
     side_H = round((2 / 3) * front_H)
 
-    # --- Pozycje elementów ---
     front_x = side_gap
     front_y = inset
     front_z = bot_gap
 
-    box_start_y = front_y + front_D  # tylna ściana frontu = inset + mdf
+    box_start_y = front_y + front_D
     box_start_x = slide_side
 
-    bottom_z = front_z + 2  # dno skrzynki 2mm wyżej niż spód frontu
+    bottom_z = front_z + 2
     bottom_y = box_start_y
 
     side_z = bottom_z + bot
@@ -183,23 +161,18 @@ def load_drawer(path: str) -> DrawerModel:
     rear_y = box_start_y + box_depth - mdf
     rear_z = side_z
 
-    # Wysokość montażu prowadnicy: spód prowadnicy 50mm od spodu dna (zasada 20)
     slide_z_abs = bottom_z + 50.0
-
-    # Pozycje otworów montażowych (Y) na boku skrzynki
     holes_y = _mount_holes_y(slide_cfg, nl, box_start_y)
 
-    boards = []
+    boards: list[Board] = []
 
-    # Front
     boards.append(Board(
         name='front',
-        width=front_W, height=front_H, depth=front_D,
+        width=nw - 2 * side_gap, height=front_H, depth=front_D,
         pos=(front_x, front_y, front_z),
         color=(0.6, 0.45, 0.3, 1.0),
     ))
 
-    # Dno (zasady 12–14: pełna szerokość i głębokość)
     boards.append(Board(
         name='bottom',
         width=box_W_ext, height=bot, depth=box_depth,
@@ -207,7 +180,7 @@ def load_drawer(path: str) -> DrawerModel:
         color=(0.75, 0.6, 0.4, 1.0),
     ))
 
-    # Bok lewy (zasada 16: głębokość = box_depth - mdf)
+    right_x = box_start_x + box_W_ext - mdf
     left = Board(
         name='side_left',
         width=mdf, height=side_H, depth=box_depth - mdf,
@@ -221,8 +194,6 @@ def load_drawer(path: str) -> DrawerModel:
         ))
     boards.append(left)
 
-    # Bok prawy
-    right_x = box_start_x + box_W_ext - mdf
     right = Board(
         name='side_right',
         width=mdf, height=side_H, depth=box_depth - mdf,
@@ -236,7 +207,6 @@ def load_drawer(path: str) -> DrawerModel:
         ))
     boards.append(right)
 
-    # Tył (zasada 15: pełna szerokość box_W_ext, leży na dnie)
     boards.append(Board(
         name='rear',
         width=box_W_ext, height=side_H, depth=mdf,
@@ -244,118 +214,121 @@ def load_drawer(path: str) -> DrawerModel:
         color=(0.7, 0.55, 0.38, 1.0),
     ))
 
-    # --- Otwory łączeniowe (konfirmaty) wg zasad 27/29 ---
     bd = {b.name: b for b in boards}
     joints: list[tuple[str, str]] = []
     JH = JointHole
 
-    def _add_confirmats(name_a: str, name_b: str,
-                        positions: list[float],
-                        ax: float, ay_or_az_a: float, az_or_ay_a: float, dir_a: str,
-                        bx: float, ay_or_az_b: float, az_or_ay_b: float, dir_b: str,
-                        axis: str = 'y'):
-        """Dodaj konfirmaty między dwiema deskami."""
-        for p in positions:
-            if axis == 'y':
-                bd[name_a].joint_holes.append(JH(ax, p, az_or_ay_a, dir_a, 1, name_b))
-                bd[name_b].joint_holes.append(JH(bx, p, az_or_ay_b, dir_b, 2, name_a))
-            elif axis == 'x':
-                bd[name_a].joint_holes.append(JH(p, ay_or_az_a, az_or_ay_a, dir_a, 1, name_b))
-                bd[name_b].joint_holes.append(JH(p, ay_or_az_b, az_or_ay_b, dir_b, 2, name_a))
-            else:  # axis == 'z'
-                bd[name_a].joint_holes.append(JH(p, ay_or_az_a, az_or_ay_a, dir_a, 1, name_b))
-                bd[name_b].joint_holes.append(JH(p, ay_or_az_b, az_or_ay_b, dir_b, 2, name_a))
-        joints.append((name_a, name_b))
+    x_sl = box_start_x + mdf / 2
+    x_sr = right_x + mdf / 2
+    rear_y_back = rear_y + mdf
+    rear_cy = rear_y + mdf / 2
 
-    x_sl = box_start_x + mdf / 2   # środek boku lewego w X
-    x_sr = right_x + mdf / 2       # środek boku prawego w X
-    rear_y_back = rear_y + mdf      # tylna ściana tylnej deski
-
-    # 1. Dno ↔ Bok lewy  (konfirmaty w osi Y, otwory -Z na dnie, -Z na boku)
     for yp in _joint_positions(side_y, box_depth - mdf):
         bd['bottom'].joint_holes.append(JH(x_sl, yp, bottom_z, '-z', 1, 'side_left'))
         bd['side_left'].joint_holes.append(JH(x_sl, yp, side_z, '-z', 2, 'bottom'))
     joints.append(('bottom', 'side_left'))
 
-    # 2. Dno ↔ Bok prawy
     for yp in _joint_positions(side_y, box_depth - mdf):
         bd['bottom'].joint_holes.append(JH(x_sr, yp, bottom_z, '-z', 1, 'side_right'))
         bd['side_right'].joint_holes.append(JH(x_sr, yp, side_z, '-z', 2, 'bottom'))
     joints.append(('bottom', 'side_right'))
 
-    # 3. Tył ↔ Bok lewy  (konfirmaty w osi Z, od tyłu tylnej deski w -Y do boku)
     for zp in _joint_positions(rear_z, side_H):
         bd['rear'].joint_holes.append(JH(x_sl, rear_y_back, zp, '+y', 1, 'side_left'))
         bd['side_left'].joint_holes.append(JH(x_sl, rear_y, zp, '+y', 2, 'rear'))
     joints.append(('rear', 'side_left'))
 
-    # 4. Tył ↔ Bok prawy
     for zp in _joint_positions(rear_z, side_H):
         bd['rear'].joint_holes.append(JH(x_sr, rear_y_back, zp, '+y', 1, 'side_right'))
         bd['side_right'].joint_holes.append(JH(x_sr, rear_y, zp, '+y', 2, 'rear'))
     joints.append(('rear', 'side_right'))
 
-    # 5. Dno ↔ Tył  (konfirmaty w osi X, od spodu w -Z przez dno do podstawy tyłu)
-    rear_cy = rear_y + mdf / 2
     for xp in _joint_positions(box_start_x, box_W_ext):
         bd['bottom'].joint_holes.append(JH(xp, rear_cy, bottom_z, '-z', 1, 'rear'))
         bd['rear'].joint_holes.append(JH(xp, rear_cy, rear_z, '-z', 2, 'bottom'))
     joints.append(('bottom', 'rear'))
 
-    # 6. Front ↔ Bok lewy  (kołki drewniane, zasady 30-33+35)
-    # Front widoczny → kołki. Otwory frontu: w płaszczyźnie (tył frontu, depth=11mm).
-    # Otwory boku: w czole (ściana przednia boku, depth=27mm).
-    # Wspólny wymiar = min(front_H, side_H) = side_H (krótszy z dwóch).
-    front_back_y = front_y + front_D          # tylna ściana frontu = box_start_y
+    front_back_y = front_y + front_D
     for zp in _joint_positions(side_z, side_H):
-        bd['front'].joint_holes.append(
-            JH(x_sl, front_back_y, zp, '+y', 1, 'side_left', 'dowel'))
-        bd['side_left'].joint_holes.append(
-            JH(x_sl, side_y, zp, '-y', 2, 'front', 'dowel'))
+        bd['front'].joint_holes.append(JH(x_sl, front_back_y, zp, '+y', 1, 'side_left', 'dowel'))
+        bd['side_left'].joint_holes.append(JH(x_sl, side_y, zp, '-y', 2, 'front', 'dowel'))
     joints.append(('front', 'side_left'))
 
-    # 7. Front ↔ Bok prawy
     for zp in _joint_positions(side_z, side_H):
-        bd['front'].joint_holes.append(
-            JH(x_sr, front_back_y, zp, '+y', 1, 'side_right', 'dowel'))
-        bd['side_right'].joint_holes.append(
-            JH(x_sr, side_y, zp, '-y', 2, 'front', 'dowel'))
+        bd['front'].joint_holes.append(JH(x_sr, front_back_y, zp, '+y', 1, 'side_right', 'dowel'))
+        bd['side_right'].joint_holes.append(JH(x_sr, side_y, zp, '-y', 2, 'front', 'dowel'))
     joints.append(('front', 'side_right'))
 
-    # 8. Front ↔ Dno  (zawsze dwa kołki, zasada 35)
-    # Otwory frontu: w płaszczyźnie (tył frontu), Z = środek grubości dna
-    # Otwory dna: w czole (przednia krawędź), depth = 27mm
     bottom_z_center = bottom_z + bot / 2
     for xp in _joint_positions(box_start_x, box_W_ext):
-        bd['front'].joint_holes.append(
-            JH(xp, front_back_y, bottom_z_center, '+y', 1, 'bottom', 'dowel'))
-        bd['bottom'].joint_holes.append(
-            JH(xp, bottom_y, bottom_z_center, '-y', 2, 'front', 'dowel'))
+        bd['front'].joint_holes.append(JH(xp, front_back_y, bottom_z_center, '+y', 1, 'bottom', 'dowel'))
+        bd['bottom'].joint_holes.append(JH(xp, bottom_y, bottom_z_center, '-y', 2, 'front', 'dowel'))
     joints.append(('front', 'bottom'))
 
-    # --- Wyśrodkuj model: (0,0,0) = centrum bbox ---
+    return boards, joints, nl
+
+
+def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[Board]:
+    """Przesuwa wszystkie deski i ich otwory o podany offset."""
+    result = []
+    for b in boards:
+        result.append(Board(
+            name=b.name,
+            width=b.width, height=b.height, depth=b.depth,
+            pos=(b.pos[0] + dx, b.pos[1] + dy, b.pos[2] + dz),
+            color=b.color,
+            holes=[Hole(h.x+dx, h.y+dy, h.z+dz, h.diameter, h.depth, h.direction)
+                   for h in b.holes],
+            joint_holes=[JointHole(jh.x+dx, jh.y+dy, jh.z+dz,
+                                   jh.direction, jh.element, jh.partner, jh.hole_type)
+                         for jh in b.joint_holes],
+            movable=b.movable,
+        ))
+    return result
+
+
+def _center_model(boards: list[Board]) -> list[Board]:
+    """Przesuwa cały model tak, by centrum bboxa znalazło się w (0,0,0)."""
     xs = [b.pos[0] for b in boards] + [b.pos[0] + b.width  for b in boards]
     ys = [b.pos[1] for b in boards] + [b.pos[1] + b.depth  for b in boards]
     zs = [b.pos[2] for b in boards] + [b.pos[2] + b.height for b in boards]
     cx = (min(xs) + max(xs)) / 2
     cy = (min(ys) + max(ys)) / 2
     cz = (min(zs) + max(zs)) / 2
+    return _shift_boards(boards, -cx, -cy, -cz)
 
-    for b in boards:
-        b.pos = (b.pos[0] - cx, b.pos[1] - cy, b.pos[2] - cz)
-        b.holes = [
-            Hole(h.x - cx, h.y - cy, h.z - cz, h.diameter, h.depth, h.direction)
-            for h in b.holes
-        ]
-        b.joint_holes = [
-            JH(jh.x - cx, jh.y - cy, jh.z - cz,
-               jh.direction, jh.element, jh.partner, jh.hole_type)
-            for jh in b.joint_holes
-        ]
+
+def load_drawer(path: str) -> DrawerModel:
+    with open(path) as f:
+        cfg = yaml.safe_load(f)
+
+    nw = cfg['niche']['width']
+    nh = cfg['niche']['height']
+    nd = cfg['niche']['depth']
+
+    mdf = cfg['material']['thickness']
+    bot = cfg['material']['bottom_thickness']
+
+    slide_model_id = cfg['slides']['model']
+    db = _load_slides_db()
+    if slide_model_id not in db:
+        raise ValueError(f"Nieznany model prowadnicy: '{slide_model_id}'. Dostępne: {list(db)}")
+    slide_cfg = db[slide_model_id]
+
+    top_gap = cfg['front']['top_gap']
+    inset   = cfg['front']['inset']
+    side_gap = cfg['front']['side_gap']
+    bot_gap  = cfg['front']['bottom_gap']
+
+    front_H = nh - top_gap - bot_gap
+
+    boards, joints, nl = _build_drawer(nw, front_H, nd, mdf, bot, slide_cfg,
+                                       inset, side_gap, bot_gap)
+    boards = _center_model(boards)
 
     return DrawerModel(
         boards=boards,
-        max_travel=box_depth,
+        max_travel=float(nl),
         slide_model=slide_model_id,
         slide_nl=nl,
         joints=joints,
