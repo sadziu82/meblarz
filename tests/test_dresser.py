@@ -7,7 +7,7 @@ import pytest
 
 from parts.dresser import load_dresser, height_to_front_H
 
-YAML_PATH = str(Path(__file__).parent.parent / 'projects' / 'dresser.yaml')
+YAML_PATH = str(Path(__file__).parent / 'fixtures' / 'dresser.yaml')
 
 # ── Parameters from dresser.yaml ────────────────────────────────────────────────────
 CW, CH, CD  = 410, 2070, 1100

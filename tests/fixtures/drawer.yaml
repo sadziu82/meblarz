@@ -1,0 +1,23 @@
+# Szuflada wewnętrzna bez uchwytu z prowadnicami kulkowymi
+# Wymiary wnęki (klient podaje):
+niche:
+  width: 410    # szerokość wnęki [mm]
+  height: 420   # wysokość wnęki [mm]
+  depth: 1000   # głębokość wnęki [mm]
+
+# Prowadnica – referencja do modelu z prowadnice.yaml
+# Długość NL dobierana automatycznie wg głębokości wnęki
+slides:
+  model: GTV-H53
+
+# Parametry materiałowe (domyślne)
+material:
+  thickness: 18         # MDF 18mm
+  bottom_thickness: 18  # dno skrzynki MDF 18mm
+
+# Parametry frontu
+front:
+  top_gap: 50       # przerwa górna [mm] (szuflada bez uchwytu, zasada 4)
+  inset: 1.5        # cofnięcie frontu względem lica korpusu [mm] (zasada 5)
+  side_gap: 3       # szczelina boczna [mm] (zasada 11)
+  bottom_gap: 3     # szczelina dolna [mm] (zasada 11)

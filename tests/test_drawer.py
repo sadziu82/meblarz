@@ -8,7 +8,7 @@ import pytest
 from parts.drawer import load_drawer, _joint_positions, _select_nl
 
 
-YAML_PATH = str(Path(__file__).parent.parent / 'projects' / 'drawer.yaml')
+YAML_PATH = str(Path(__file__).parent / 'fixtures' / 'drawer.yaml')
 
 # ── Expected values for drawer.yaml (410×420×1000mm, GTV-H53) ─────────────────
 NW, NH, ND  = 410, 420, 1000

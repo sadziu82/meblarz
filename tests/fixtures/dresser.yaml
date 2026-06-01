@@ -1,0 +1,45 @@
+# Szafka (komoda) z szufladami wewnętrznymi
+# Wymiary zewnętrzne podaje klient — program wylicza korpus, poprzeczki i szuflady.
+
+carcass:
+  width:  410    # szerokość zewnętrzna [mm]
+  height: 2070   # wysokość zewnętrzna [mm]
+  depth:  1100   # głębokość zewnętrzna [mm]
+  # Wariant konstrukcyjny: wierzch i spód mają pełną szerokość zewnętrzną;
+  # boki mieszczą się między nimi (height_bok = height - 2×thickness).
+  placement: builtin_both   # 'freestanding' | 'builtin_left' | 'builtin_right' | 'builtin_both'
+
+material:
+  thickness:        18   # MDF 18mm – wierzch, spód, boki korpusu
+  back_thickness:    0   # tył otwarty (zasada 3: szafka z szufladami)
+  drawer_thickness: 18   # MDF 18mm – elementy skrzynki szuflady
+  drawer_bottom:    18   # MDF 18mm – dno skrzynki szuflady
+
+plinth:
+  height:      170   # wysokość cokołu [mm]; 0 = brak cokołu (szafka stoi na spodzie)
+  inset_front: 450   # wcięcie cokołu od lica frontu korpusu [mm]
+  inset_side:    0   # wcięcie cokołu od boków korpusu [mm] (dla wolnostojących)
+
+rail:                    # poprzeczka między szufladami (z rowkiem na taśmę LED)
+  depth:      100        # głębokość poprzeczki [mm] (reszta głębokości otwarta)
+  thickness:   18        # MDF 18mm
+  led_groove:
+    width:    12         # szerokość rowka [mm]
+    depth:     4         # głębokość rowka [mm]
+    face:   bottom       # rowek na spodniej ścianie poprzeczki
+    offset:   20         # odległość osi rowka od przedniej krawędzi poprzeczki [mm]
+
+drawers:
+  count: 5
+  # distribution: equal         # 'equal' = równy podział wysokości wnęki
+  distribution: custom
+  heights: [380, 380, 180]   # wysokości frontów od dołu do góry [mm]
+
+slides:
+  model: GTV-H53              # głębokość 460mm < 600mm → standardowa prowadnica
+
+front:
+  inset:      1.5   # cofnięcie frontów względem lica korpusu [mm]
+  side_gap:   3     # szczelina boczna każdego frontu [mm]
+  bottom_gap: 3     # szczelina pod każdym frontem (od poprzeczki lub spodu korpusu) [mm]
+  top_gap:   50     # przerwa na palce nad każdym frontem [mm]
