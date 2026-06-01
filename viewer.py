@@ -192,6 +192,8 @@ class GLWidget(QOpenGLWidget):
         self._open_per_group: dict[str, float] = {}
         self._board_group_keys: list[str] = []
         self._model_center_z: float = 0.0
+        self._grid_back_y:    float = 0.0   # back face of furniture (max Y)
+        self._grid_left_x:    float = 0.0   # left face of furniture (min X)
         self._anim_targets: dict[str, float] = {}                   # grupa → cel (0.0–1.0)
         self._anim_start: dict[str, tuple[float, float]] = {}       # grupa → (wartość_startowa, czas)
         self._anim_timer = QTimer(self)
@@ -260,8 +262,10 @@ class GLWidget(QOpenGLWidget):
             xs = [b.pos[0] for b in model.boards] + [b.pos[0]+b.width  for b in model.boards]
             ys = [b.pos[1] for b in model.boards] + [b.pos[1]+b.depth  for b in model.boards]
             zs = [b.pos[2] for b in model.boards] + [b.pos[2]+b.height for b in model.boards]
-            self._scene_size    = max(max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs), 300)
+            self._scene_size     = max(max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs), 300)
             self._model_center_z = (min(zs) + max(zs)) / 2
+            self._grid_back_y    = max(ys)
+            self._grid_left_x    = min(xs)
         self.update()
 
     # ── OpenGL ────────────────────────────────────────────────────────────────
@@ -464,18 +468,27 @@ class GLWidget(QOpenGLWidget):
     def _draw_grid(self):
         glDisable(GL_LIGHTING); glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glLineWidth(0.5)
-        s = self._scene_size * 0.8; step = 100
-        r = range(-int(s)//step*step, int(s)+step, step)
+        s  = self._scene_size * 0.8; step = 100
+        bk = self._grid_back_y   # back wall: max Y of furniture
+        lx = self._grid_left_x   # left wall: min X of furniture
+        r  = range(-int(s)//step*step, int(s)+step, step)
         glBegin(GL_LINES)
         for i in r:
-            glColor4f(0.35,0.40,0.55,0.25); glVertex3f(i,-s,0); glVertex3f(i,s,0); glVertex3f(-s,i,0); glVertex3f(s,i,0)
-            glColor4f(0.30,0.48,0.36,0.25); glVertex3f(i,0,-s); glVertex3f(i,0,s); glVertex3f(-s,0,i); glVertex3f(s,0,i)
-            glColor4f(0.50,0.32,0.32,0.25); glVertex3f(0,i,-s); glVertex3f(0,i,s); glVertex3f(0,-s,i); glVertex3f(0,s,i)
+            # floor (Z=0)
+            glColor4f(0.35,0.40,0.55,0.25)
+            glVertex3f(i,-s,0); glVertex3f(i,s,0); glVertex3f(-s,i,0); glVertex3f(s,i,0)
+            # back wall (Y=back_y, XZ plane)
+            glColor4f(0.30,0.48,0.36,0.25)
+            glVertex3f(i,bk,-s); glVertex3f(i,bk,s); glVertex3f(-s,bk,i); glVertex3f(s,bk,i)
+            # left wall (X=left_x, YZ plane)
+            glColor4f(0.50,0.32,0.32,0.25)
+            glVertex3f(lx,i,-s); glVertex3f(lx,i,s); glVertex3f(lx,-s,i); glVertex3f(lx,s,i)
         glEnd()
         glLineWidth(1.2); glBegin(GL_LINES)
-        glColor4f(0.75,0.20,0.20,0.7); glVertex3f(-s,0,0); glVertex3f(s,0,0)
-        glColor4f(0.20,0.75,0.20,0.7); glVertex3f(0,-s,0); glVertex3f(0,s,0)
-        glColor4f(0.25,0.45,0.90,0.7); glVertex3f(0,0,-s); glVertex3f(0,0,s)
+        # axis lines at the furniture's back-left corner
+        glColor4f(0.75,0.20,0.20,0.7); glVertex3f(-s,bk,0); glVertex3f(s,bk,0)   # X axis on back wall
+        glColor4f(0.20,0.75,0.20,0.7); glVertex3f(lx,-s,0); glVertex3f(lx,s,0)   # Y axis on left wall
+        glColor4f(0.25,0.45,0.90,0.7); glVertex3f(lx,bk,-s); glVertex3f(lx,bk,s) # Z axis at back-left corner
         glEnd()
         glLineWidth(1.0); glDisable(GL_BLEND); glEnable(GL_LIGHTING)
 
