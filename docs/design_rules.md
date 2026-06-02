@@ -109,50 +109,31 @@
 
 ---
 
-## OPENSCAD
-
-47. **ASCII only** in variable and module names. Polish characters only in comments (`//`).
-48. Aesthetic elements (fronts) must be **separate modules** — do not nest them inside the box module.
-49. Before writing code draw a cross-section — identify which element is the base, which stand on it, which wrap around it.
-50. For holes joining two elements at different Z heights — calculate position in **global coordinates** (add offset between elements).
-51. Cylinder rotation directions (default direction is `+Z`):
-    - drilling in `+Y`: `rotate([-90,0,0])`
-    - drilling in `-Y`: `rotate([90,0,0])`
-    - drilling in `-Z`: `rotate([180,0,0])`
-    - drilling in `+Z`: no rotation
-52. Holes are drilled from the surface inward — the cylinder starts at the surface + **0.1mm** overshoot (for correct `difference()` operation).
-53. Two confirmat hole modules:
-    - `conf_hole()` — **first element**: ø11mm countersink + ø5mm through hole
-    - `conf_hole_thread()` — **second element**: ø5mm threaded hole only, depth 35mm
-54. Exploded view — each element offset in its natural assembly direction (front in -Y, sides in ±X, rear in +Y, bottom in -Z). Parameter `explode = 0/1` to toggle.
-
----
-
 ## CARCASS
 
 ### Structure and dimensions
 
-55. The client provides external furniture dimensions. **`carcass.height` is the total height from floor to top, including the plinth.** Top and bottom panels have full external width (`width`). Sides fit between them. Internal dimensions: `int_W = width − 2×thickness`, `int_H = (height − plinth.height) − 2×thickness`, `int_D = depth`.
-56. Back of a drawer cabinet — **open** (rule 3). Do not use HDF back with drawers.
-57. Cabinet type `placement` determines side visibility: `freestanding` — both sides visible; `builtin_left/right` — one side against a wall (hidden); `builtin_both` — both sides hidden.
+47. The client provides external furniture dimensions. **`carcass.height` is the total height from floor to top, including the plinth.** Top and bottom panels have full external width (`width`). Sides fit between them. Internal dimensions: `int_W = width − 2×thickness`, `int_H = (height − plinth.height) − 2×thickness`, `int_D = depth`.
+48. Back of a drawer cabinet — **open** (rule 3). Do not use HDF back with drawers.
+49. Cabinet type `placement` determines side visibility: `freestanding` — both sides visible; `builtin_left/right` — one side against a wall (hidden); `builtin_both` — both sides hidden.
 
 ### Carcass joints
 
-58. **Top ↔ sides** and **bottom ↔ sides** — drilling direction depends on joint type:
+50. **Top ↔ sides** and **bottom ↔ sides** — drilling direction depends on joint type:
     - **Dowels** (visible side): top — in-plane hole from the **bottom face** (inside cabinet); bottom — in-plane hole from the **top face** (inside cabinet). Matching end holes in the sides.
     - **Confirmats** (hidden side): top — head on the **top face** (hidden by worktop/enclosure), drilled top-down through top into side end; bottom — head on the **bottom face** (under cabinet), drilled bottom-up through bottom into side end.
-59. **Rail ↔ sides** — drilling direction depends on side visibility:
+51. **Rail ↔ sides** — drilling direction depends on side visibility:
     - **Dowels** (visible side): element 1 from the **inner** face of the side (hidden inside cabinet), in-plane; element 2 — rail end.
     - **Confirmats** (hidden side): element 1 from the **outer** face of the side (against the wall, hidden), drilled through side into rail end; element 2 — rail end.
-60. Lower kitchen cabinet (no top, with load-bearing rails) — separate type, separate rules.
+52. Lower kitchen cabinet (no top, with load-bearing rails) — separate type, separate rules.
 
 ### Height distribution — drawers with rails
 
-61. Number of rails between drawers = `count − 1`. Each rail has width `int_W` and depth per spec (default 100mm).
-62. Element sequence bottom to top (per drawer): `bottom_gap` (3mm) → drawer front → `top_gap` (50mm, finger clearance) → rail (18mm) → … → last drawer front → `top_gap` → underside of top. A rail does **not** follow the top-most drawer.
-63. Front height with equal distribution (`distribution: equal`): `front_H = (int_H − (count−1)×rail_thickness − count×(top_gap + bottom_gap)) / count`. Round down; add any remainder to the **lowest** drawer.
-64. With custom distribution (`distribution: custom`) — the `heights` list is given **from lowest to highest** drawer. Fewer values than `count` may be given — missing drawers (highest ones) are calculated as an equal split of the remaining height. Missing values are always interpreted as `front_H`.
-65. Parameter `height_mode` (only with `distribution: custom`) specifies what the given heights represent:
+53. Number of rails between drawers = `count − 1`. Each rail has width `int_W` and depth per spec (default 100mm).
+54. Element sequence bottom to top (per drawer): `bottom_gap` (3mm) → drawer front → `top_gap` (50mm, finger clearance) → rail (18mm) → … → last drawer front → `top_gap` → underside of top. A rail does **not** follow the top-most drawer.
+55. Front height with equal distribution (`distribution: equal`): `front_H = (int_H − (count−1)×rail_thickness − count×(top_gap + bottom_gap)) / count`. Round down; add any remainder to the **lowest** drawer.
+56. With custom distribution (`distribution: custom`) — the `heights` list is given **from lowest to highest** drawer. Fewer values than `count` may be given — missing drawers (highest ones) are calculated as an equal split of the remaining height. Missing values are always interpreted as `front_H`.
+57. Parameter `height_mode` (only with `distribution: custom`) specifies what the given heights represent:
     - `front` (default) — front height.
     - `niche` — niche height: `front_H = h − top_gap − bottom_gap`.
     - `interior` — max contents height (= `side_H`): `front_H = ⌊3h/2⌋` (minimum front_H yielding `side_H ≥ h`).
@@ -160,10 +141,10 @@
 
 ### LED rail groove
 
-66. LED strip groove milled on the **bottom face** of the rail, 20mm from the front edge, 12×4mm. The groove illuminates the open drawer below.
-67. The rail does not reach full carcass depth — open space remains behind it. Default depth: 100mm.
+58. LED strip groove milled on the **bottom face** of the rail, 20mm from the front edge, 12×4mm. The groove illuminates the open drawer below.
+59. The rail does not reach full carcass depth — open space remains behind it. Default depth: 100mm.
 
 ### Plinth
 
-68. The plinth is a separate element mounted under the carcass bottom. `carcass.height` is the total furniture height **including the plinth** — carcass height without plinth = `height − plinth.height`. Parameters: `height` (default 100mm), `inset_front` (inset from front face, default 15mm), `inset_side` (inset from sides, default 15mm). `height: 0` means no plinth.
-69. The plinth consists of a front board and two side boards (open back). Front board width: `width − 2×inset_side`. Side board depth: `depth − inset_front − thickness`. *(Side boards start behind the rear face of the front board.)* Joints: confirmats from the outer (bottom) face of the plinth — the plinth underside is not visible in normal use.
+60. The plinth is a separate element mounted under the carcass bottom. `carcass.height` is the total furniture height **including the plinth** — carcass height without plinth = `height − plinth.height`. Parameters: `height` (default 100mm), `inset_front` (inset from front face, default 15mm), `inset_side` (inset from sides, default 15mm). `height: 0` means no plinth.
+61. The plinth consists of a front board and two side boards (open back). Front board width: `width − 2×inset_side`. Side board depth: `depth − inset_front − thickness`. *(Side boards start behind the rear face of the front board.)* Joints: confirmats from the outer (bottom) face of the plinth — the plinth underside is not visible in normal use.
