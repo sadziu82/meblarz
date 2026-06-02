@@ -217,7 +217,7 @@ def load_dresser(path: str) -> DrawerModel:
               for i in range(n_drawers - 1)]
 
     # ── Joint types ───────────────────────────────────────────────────────────
-    # Visible sides → dowels; hidden sides → confirmats (rules 57-58)
+    # Visible sides → dowels; hidden sides → confirmats (rules 49-51)
     left_visible  = placement in ('freestanding', 'builtin_right')
     right_visible = placement in ('freestanding', 'builtin_left')
 

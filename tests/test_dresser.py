@@ -1,6 +1,6 @@
 """
 Unit tests for dresser (chest of drawers).
-Verifies rules 54–66 from design_rules.md.
+Verifies rules 47–61 from design_rules.md.
 """
 from pathlib import Path
 import pytest
