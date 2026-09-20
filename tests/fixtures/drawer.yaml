@@ -12,8 +12,8 @@ slides:
 
 # Parametry materiałowe (domyślne)
 material:
-  thickness: 18         # MDF 18mm
-  bottom_thickness: 18  # dno skrzynki MDF 18mm
+  thickness: 18         # płyta meblowa 18mm
+  bottom_thickness: 18  # dno skrzynki płyta meblowa 18mm
 
 # Parametry frontu
 front:

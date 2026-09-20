@@ -3,6 +3,133 @@
 
 slides:
 
+  GTV-PK-L-H45-400-B-20:
+    name: GTV Versalite Plus 400 mm black soft close
+    manufacturer: GTV
+    symbol: PK-L-H45-400-B-20
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PK-L-H45-...-B__karta%20techniczna_20.pdf
+    mounting: side
+    height_mm: 45.3
+    side_clearance_mm: 13
+    load_capacity_kg: 40
+    extension: full
+    soft_close: true
+    travel_mm: 400
+    rear_clearance_mm: 3
+    available_lengths_mm: [400]
+    color: [0.12, 0.12, 0.12, 1]
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [160, 97]
+      carcass_positions_mm: [37, 101, 197]
+      carcass_hole_diameter_mm: 3
+      box_hole_diameter_mm: 3
+      hole_depth_mm: 10
+
+  GTV-PK-L-H45-450-B-20:
+    name: GTV Versalite Plus 450 mm black soft close
+    manufacturer: GTV
+    symbol: PK-L-H45-450-B-20
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PK-L-H45-...-B__karta%20techniczna_20.pdf
+    mounting: side
+    height_mm: 45.3
+    side_clearance_mm: 13
+    load_capacity_kg: 40
+    extension: full
+    soft_close: true
+    travel_mm: 450
+    rear_clearance_mm: 3
+    available_lengths_mm: [450]
+    color: [0.12, 0.12, 0.12, 1]
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [160, 144]
+      carcass_positions_mm: [37, 101, 261]
+      carcass_hole_diameter_mm: 3
+      box_hole_diameter_mm: 3
+      hole_depth_mm: 10
+
+  SEVROLL-04897:
+    name: Sevroll H45 300 mm soft close
+    manufacturer: Sevroll
+    symbol: '04897'
+    source: https://sevroll.com/wp-content/uploads/2026/09/Instrukcje-montazu-PL_2026_online.pdf#page=306
+    mounting: side
+    height_mm: 45.2
+    side_clearance_mm: 13   # selected within manufacturer range 12.8–13.6
+    load_capacity_kg: 30
+    extension: full
+    soft_close: true
+    travel_mm: 268         # manufacturer 268 ±2 for length 300
+    rear_clearance_mm: 10  # project allowance, not a manufacturer minimum
+    available_lengths_mm: [300]
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [169]
+      carcass_positions_mm: [37, 133]
+      carcass_hole_diameter_mm: 3  # project pilot for wood screws
+      box_hole_diameter_mm: 3
+      hole_depth_mm: 10
+
+  GTV-PK-L-H45-300-B:
+    name: GTV H45 soft close 300 mm
+    manufacturer: GTV
+    symbol: PK-L-H45-300-B
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PK-L-H45-...-B__karta%20techniczna_10.pdf
+    mounting: side
+    height_mm: 45.3
+    side_clearance_mm: 13  # selected within 12.7 +0.3
+    load_capacity_kg: 40
+    extension: full
+    soft_close: true
+    travel_mm: 296         # length 300 minus AV=4
+    rear_clearance_mm: 3
+    available_lengths_mm: [300]
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [96, 82]
+      carcass_positions_mm: [37, 101] # centreline holes; rear pair uses different heights
+      carcass_hole_diameter_mm: 3
+      box_hole_diameter_mm: 3
+      hole_depth_mm: 10
+
+  GTV-PB-G10HX300-H:
+    name: GTV G10 HX 300 mm undermount soft close
+    manufacturer: GTV
+    symbol: PB-G10HX300-H
+    source: https://gtv.com.pl/produkt/PB-G10HX300-H/
+    technical_drawing: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PB-G10HX_H_instr.pdf
+    mounting: undermount
+    geometry_supported: false
+    max_side_thickness_mm: 16
+    load_capacity_kg: 25
+    extension: partial
+    soft_close: true
+    available_lengths_mm: [300]
+    notes: Requires an undermount drawer generator with pin fixings; not compatible with the side-mounted drawer geometry.
+
+  GTV-H45-XP-500:
+    name: "GTV H45 XP 500 mm, full extension"
+    manufacturer: GTV
+    symbol: PK-0H45500XP
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/Karta_techniczna_2020_150-151.pdf
+    height_mm: 43.7
+    side_clearance_mm: 12.7   # manufacturer tolerance ±0.2; do not round
+    load_capacity_kg: 30
+    extension: full
+    rear_clearance_mm: 3
+    available_lengths_mm: [500]
+    # Centreline fixing positions selected from the 500 mm drawing, page 149.
+    # Pilot bore diameter/depth below are a design choice for wood screws,
+    # not the diameter of the slots in the steel runners.
+    inner_drawer_mount:
+      first_hole_from_edge_mm: 35
+      spacing_pattern_mm: [192, 224]
+      carcass_positions_mm: [37, 101, 261, 389]
+      carcass_hole_diameter_mm: 3
+      box_hole_diameter_mm: 3
+      hole_depth_mm: 10
+
   # ── GTV Ball-bearing slide H53 ───────────────────────────────────────────────
   # Source: Karta_produktowa_PL-EN-RU__2021_65.pdf
   # Use: deep drawers (>600mm), load up to 100kg

@@ -110,6 +110,12 @@ def _rename_drawer(boards: list[Board],
             ],
             movable=b.movable,
             move_fraction=b.move_fraction,
+            travel=b.travel,
+            corner_radius=b.corner_radius,
+            rounded_front_corners=b.rounded_front_corners,
+            grooves=list(b.grooves),
+            fabrication=b.fabrication,
+            yaw=b.yaw,
         ))
     renamed_joints = [(name_map[a], name_map[b]) for a, b in joints]
     return renamed, renamed_joints
@@ -410,13 +416,14 @@ def load_dresser(path: str) -> DrawerModel:
             nw=interior_W,
             front_H=front_heights[i],
             nd=interior_D,
-            mdf=d_thick,
+            board_thickness=d_thick,
             bot=d_bot,
             slide_cfg=slide_cfg,
             inset=inset,
             side_gap=side_gap,
             bot_gap=bot_gap,
             target_nl=target_nl,
+            handle=cfg['front'].get('handle'),
         )
         nl_used = nl
 
@@ -435,7 +442,12 @@ def load_dresser(path: str) -> DrawerModel:
         carcass_depth = mount['hole_depth_mm']
         for b in drawer_boards:
             if b.name == f'{prefix}side_left':
-                for h in b.holes:
+                fixed_holes = b.holes
+                if 'carcass_positions_mm' in mount:
+                    fixed_holes = [Hole(thick, b.pos[1] + p, b.holes[0].z,
+                                        carcass_diam, carcass_depth, '+x')
+                                   for p in mount['carcass_positions_mm']]
+                for h in fixed_holes:
                     side_l.holes.append(Hole(
                         x=thick, y=h.y, z=h.z,
                         diameter=carcass_diam, depth=carcass_depth,
@@ -456,7 +468,7 @@ def load_dresser(path: str) -> DrawerModel:
 
     return DrawerModel(
         boards=all_boards,
-        max_travel=float(nl_used),
+        max_travel=float(slide_cfg.get('travel_mm', nl_used)),
         slide_model=slide_id,
         slide_nl=nl_used,
         joints=all_joints,

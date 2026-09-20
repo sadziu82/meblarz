@@ -1,0 +1,123 @@
+# Desk wall with a drawer tower. All dimensions are millimetres.
+desk_drawer_wall:
+  height: 2200
+
+  desk:
+    width: 1500
+    depth: 650
+    height: 740
+    left_side:
+      depth: 450            # same depth as the drawer tower
+    corner_rounding:
+      sides: both           # none | left | right | both (front corners)
+      radius: 80
+    led_groove:
+      enabled: true
+      face: -z
+      width: 12
+      depth: 4
+      offset: 30
+    keyboard_tray:
+      enabled: true
+      width: 900
+      depth: 350
+      drop: 120             # lower than desk top
+      position: center      # center | offset
+      offset_left: 250      # used in offset mode: inner left side -> tray left edge
+      offset_front: 0
+      slides:
+        model: GTV-H45
+        nl: 350
+      travel: 250
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+    back:
+      enabled: false        # HDF panel behind the desk
+    low_shelf:
+      enabled: true
+      span: full            # full | partial
+      side: left            # used for partial shelves
+      height: 120
+      depth: 180
+      supports: 2           # 1 = centre; 2 = axes at 1/3 and 2/3 of shelf width
+
+  drawer_tower:
+    width: 700
+    depth: 450
+    back:
+      enabled: true
+    drawers:
+      count: 4
+      section_height: 800
+      rail_depth: 100
+      rail_thickness: 18
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+      slides:
+        model: GTV-H45
+      front:
+        inset: 1.5
+        side_gap: 3
+        bottom_gap: 3
+        top_gap: 50
+        handle:
+          hole_spacing: 160
+          hole_diameter: 5
+          hole_depth: 18
+          offset_top: 35
+    upper_shelves:
+      count: 1              # shelves below the common bridge, above the drawers
+      depth: 400
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+
+  overhead:
+    bridge:
+      bottom: 1400          # underside of ONE full-width top of the lower module
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+    cabinets:
+      count: 0              # optional cabinets; open shelves in this example
+      bottom: 1450
+      height: 360
+      depth: 300
+      shelf_count: 1
+    shelf_groups:
+      - count: 1            # shelves inside the upper module, split at its divider
+        width: 2200
+        depth: 400
+        bottom: 1700
+        spacing: 280
+        led_groove:
+          enabled: true
+          face: -z
+          width: 12
+          depth: 4
+          offset: 20
+      - count: 1            # shallower shelves above
+        width: 2200
+        depth: 280
+        bottom: 1950
+        spacing: 300
+
+material:
+  thickness: 18
+  back_thickness: 3
+  drawer_thickness: 18
+  drawer_bottom: 18

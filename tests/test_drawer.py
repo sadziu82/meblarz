@@ -12,7 +12,7 @@ YAML_PATH = str(Path(__file__).parent / 'fixtures' / 'drawer.yaml')
 
 # ── Expected values for drawer.yaml (410×420×1000mm, GTV-H53) ─────────────────
 NW, NH, ND  = 410, 420, 1000
-MDF         = 18
+BOARD_THICKNESS         = 18
 BOT         = 18
 TOP_GAP     = 50
 INSET       = 1.5
@@ -24,10 +24,10 @@ SLIDE_REAR  = 20
 FRONT_W         = NW - 2 * SIDE_GAP          # 404
 FRONT_H         = NH - TOP_GAP - BOT_GAP     # 367
 BOX_W           = NW - 2 * SLIDE_SIDE        # 371
-MAX_BOX_DEPTH   = ND - (MDF + INSET) - SLIDE_REAR  # 960.5
+MAX_BOX_DEPTH   = ND - (BOARD_THICKNESS + INSET) - SLIDE_REAR  # 960.5
 NL              = 950                         # największe dostępne NL ≤ 960.5
 SIDE_H          = round(2 / 3 * FRONT_H)     # 245
-SIDE_D          = NL - MDF                   # 932  (głębokość boku)
+SIDE_D          = NL - BOARD_THICKNESS                   # 932  (głębokość boku)
 
 
 @pytest.fixture(scope='module')
@@ -166,9 +166,9 @@ class TestFrontDimensions:
         """Przerwa górna 50mm dla szuflady bez uchwytu (reguła 4)."""
         assert bd['front'].height == pytest.approx(NH - 50 - BOT_GAP)
 
-    def test_front_thickness_equals_mdf(self, bd):
-        """Front ma grubość MDF=18mm (reguła 2)."""
-        assert bd['front'].depth == pytest.approx(MDF)
+    def test_front_thickness_equals_board_thickness(self, bd):
+        """Front ma grubość BOARD_THICKNESS=18mm (reguła 2)."""
+        assert bd['front'].depth == pytest.approx(BOARD_THICKNESS)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -201,11 +201,11 @@ class TestBoxDimensions:
         assert model.slide_nl + 50 > MAX_BOX_DEPTH  # następne NL już nie mieści się
 
     def test_bottom_thickness(self, bd):
-        """Dno MDF=18mm (reguła 7)."""
+        """Dno BOARD_THICKNESS=18mm (reguła 7)."""
         assert bd['bottom'].height == pytest.approx(BOT)
 
     def test_side_depth(self, bd):
-        """Głębokość boków = box_depth − mdf (reguła 16)."""
+        """Głębokość boków = box_depth − board_thickness (reguła 16)."""
         assert bd['side_left'].depth == pytest.approx(SIDE_D)
         assert bd['side_right'].depth == pytest.approx(SIDE_D)
 
@@ -213,9 +213,9 @@ class TestBoxDimensions:
         """Tył ma pełną szerokość box_W_ext — taką samą jak dno (reguła 15)."""
         assert bd['rear'].width == pytest.approx(bd['bottom'].width)
 
-    def test_rear_depth_equals_mdf(self, bd):
-        """Grubość tylnej ścianki = MDF=18mm."""
-        assert bd['rear'].depth == pytest.approx(MDF)
+    def test_rear_depth_equals_board_thickness(self, bd):
+        """Grubość tylnej ścianki = 18mm."""
+        assert bd['rear'].depth == pytest.approx(BOARD_THICKNESS)
 
     def test_rear_height_equals_side_height(self, bd):
         """Tył ma tę samą wysokość co boki."""
@@ -244,7 +244,7 @@ class TestBoxDimensions:
         assert bd['side_right'].pos[2] == pytest.approx(bottom.pos[2] + bottom.height)
 
     def test_rear_at_back_of_bottom(self, bd):
-        """Tył przy tylnej krawędzi dna: rear.y = bottom.y + box_depth − mdf (reguła 15)."""
+        """Tył przy tylnej krawędzi dna: rear.y = bottom.y + box_depth − board_thickness (reguła 15)."""
         bottom = bd['bottom']
         rear = bd['rear']
         assert rear.pos[1] == pytest.approx(bottom.pos[1] + bottom.depth - rear.depth)
@@ -482,15 +482,15 @@ class TestLocalCoordinates:
         holes = [jh for jh in bottom.joint_holes if jh.partner == 'side_left']
         for jh in holes:
             local_x = jh.x - bottom.pos[0]
-            assert local_x == pytest.approx(MDF / 2), (
-                f"Dno↔Bok lewy X={local_x}, oczekiwano {MDF/2}"
+            assert local_x == pytest.approx(BOARD_THICKNESS / 2), (
+                f"Dno↔Bok lewy X={local_x}, oczekiwano {BOARD_THICKNESS/2}"
             )
 
     def test_bottom_side_x_center_of_right_side_thickness(self, bd):
         """Dno↔Bok prawy: X otworu na środku grubości prawego boku (reguła 19, 42)."""
         bottom = bd['bottom']
         side_right = bd['side_right']
-        expected_local_x = side_right.pos[0] - bottom.pos[0] + MDF / 2
+        expected_local_x = side_right.pos[0] - bottom.pos[0] + BOARD_THICKNESS / 2
         holes = [jh for jh in bottom.joint_holes if jh.partner == 'side_right']
         for jh in holes:
             local_x = jh.x - bottom.pos[0]
@@ -506,8 +506,8 @@ class TestLocalCoordinates:
             assert holes, f"{side_name}: brak otworów w czole"
             for jh in holes:
                 local_x = jh.x - side.pos[0]
-                assert local_x == pytest.approx(MDF / 2), (
-                    f"{side_name} czoło: local_x={local_x}, oczekiwano {MDF/2}"
+                assert local_x == pytest.approx(BOARD_THICKNESS / 2), (
+                    f"{side_name} czoło: local_x={local_x}, oczekiwano {BOARD_THICKNESS/2}"
                 )
 
     def test_bottom_czoło_holes_at_center_of_thickness(self, bd):
@@ -526,7 +526,7 @@ class TestLocalCoordinates:
         """Dno↔Tył: Y otworu na środku głębokości tylnej ścianki (reguła 21)."""
         bottom = bd['bottom']
         rear = bd['rear']
-        expected_local_y = rear.pos[1] - bottom.pos[1] + MDF / 2
+        expected_local_y = rear.pos[1] - bottom.pos[1] + BOARD_THICKNESS / 2
         holes = [jh for jh in bottom.joint_holes if jh.partner == 'rear']
         for jh in holes:
             local_y = jh.y - bottom.pos[1]
@@ -538,7 +538,7 @@ class TestLocalCoordinates:
         """Tył↔Bok lewy: X otworu na środku grubości boku (reguła 20, 42)."""
         rear = bd['rear']
         side_left = bd['side_left']
-        expected_local_x = side_left.pos[0] - rear.pos[0] + MDF / 2
+        expected_local_x = side_left.pos[0] - rear.pos[0] + BOARD_THICKNESS / 2
         holes = [jh for jh in rear.joint_holes if jh.partner == 'side_left']
         for jh in holes:
             local_x = jh.x - rear.pos[0]

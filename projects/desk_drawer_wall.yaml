@@ -1,0 +1,245 @@
+# Desk wall with a drawer tower. All dimensions are millimetres.
+desk_drawer_wall:
+  lighting_controls:
+    preview: true            # location markers only; no machining or electrical simulation
+    drawers:
+      enabled: true
+      side: left
+      above_slide: 5         # marker clearance above the fixed runner, not a switch dimension
+    shelves:
+      enabled: true
+      side: left             # provisional hand-gesture sensor at each non-drawer LED run
+  whole_mm: true           # integer board sizes and shelf divisions
+  joinery:
+    mixed_shared_sides: true  # opposite shelves: screw on one side, offset dowels on the other
+    keep_dowels:
+      module_bridge: [desk_bridge_support]  # heads would be visible on the shelf
+    hidden_faces:            # screw-head faces; other connections remain dowelled
+      desk_left_side: [-x]   # wall side
+      upper_left_side: [-x]
+      upper_top: [+z]        # above the furniture
+      module_bridge: [+z]   # heads above lower-module sides; upper feet use dowels
+      desk_top: [-z]        # low-shelf supports and rear lip, heads under desktop
+  height: 2400             # derived from bridge.top + overhead.height
+
+  desk:
+    width: 1350
+    width_mode: desktop     # actual desktop width, excluding left side
+    depth: 600
+    underside_height: 845   # desktop top = 863 with 18 mm board
+    left_side:
+      depth: 310            # same depth as the drawer tower
+    stiffeners:
+      above_top:
+        enabled: true
+        height: 130         # 32 mm lip above the low shelf
+        rear_offset: 0      # rear panel directly behind the low shelf
+      floor:
+        enabled: true
+        height: 100
+        rear_offset: 100
+    corner_rounding:
+      sides: right           # none | left | right | both (front corners)
+      radius: 200
+    led_groove:
+      enabled: true
+      face: -z
+      width: 10
+      depth: 4
+      offset: 30
+      end_margin: 20        # right end stays inside the rounded outline
+      end_margin_left: 0    # open at the left edge
+      wire_groove:
+        enabled: true
+        edge_offset: 10    # clear distance from left edge to cable channel
+        side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+    keyboard_tray:
+      enabled: true
+      width: 1000
+      depth: 500
+      clear_height: 100     # tray top to desktop underside
+      position: center      # center | offset
+      offset_left: 250      # used in offset mode: inner left side -> tray left edge
+      offset_front: 30
+      slides:
+        model: GTV-PK-L-H45-400-B-20
+        nl: 400
+        offset_front: 70    # slide begins 70 mm behind tray front
+      hanger_depth: 400     # side mounting boards start at slide front
+      travel: 400
+      led_groove:
+        enabled: false
+        face: -z
+        width: 10
+        depth: 4
+        offset: 55         # 50 mm clear from front edge (axis + half width)
+        end_margin: 50
+        wire_groove:
+          enabled: true
+          side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+    back:
+      enabled: false        # HDF panel behind the desk
+    low_shelf:
+      enabled: true
+      span: full            # full | partial
+      side: left            # used for partial shelves
+      height: 80
+      depth: 180
+      supports: 2           # 1 = centre; 2 = axes at 1/3 and 2/3 of shelf width
+      led_groove:
+        enabled: true
+        face: -z
+        width: 10
+        depth: 4
+        offset: 55
+        end_margin: 0
+        wire_groove:
+          enabled: true
+          side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+
+    monitor_setup:
+      enabled: true          # trial preview, disable to remove equipment and trial hole
+      mount_model: ART-L-02N
+      offset_x: 0            # pole position from low shelf centre
+      left_clearance: 10     # screen alignment, independent of pole position
+      max_vesa_span: 735     # user-supplied drawing; equal 367.5 mm arms
+      inward_angle: 5        # each screen turns towards the user
+      rear_offset: 60        # pole axis from low shelf rear edge
+      trial_hole_diameter: 10 # UNCONFIRMED adapter; excluded from machining exports
+      base_size: 80          # schematic mount dimensions, not a drilling template
+      pole_width: 35
+      pole_height: 450
+      vesa_height: 231       # monitor bottom 50 mm above shelf (181 mm to VESA centre)
+      forward_reach: 70      # within left arm reach with the pole centred
+      monitor_gap: 10
+      monitor:
+        model: iiyama-XUB2797QSNP-B1
+        width: 614           # rounded up from 613.5, manufacturer drawing
+        height: 364
+        depth: 48            # rounded up from 47.5
+        vesa_from_bottom: 181 # rounded from 180.5
+
+  drawer_tower:
+    width: 600
+    depth: 310
+    back:
+      enabled: true
+      behind_drawers: false
+      rabbet:
+        width: 12           # HDF overlap at outer edges
+        depth: 3.2          # clearance for 3 mm HDF
+        shared_width: 6    # overlap on partitions carrying two backs
+        horizontal: true    # also rebate the bottom and top edges of each back
+    drawers:
+      count: 5
+      bottom:
+        type: hdf_3         # hdf_3 | board_18
+      align_top_to_desk: true # shelf above drawers flush with desktop
+      rail_depth: 100
+      rail_thickness: 18
+      led_groove:
+        enabled: true
+        face: -z
+        width: 10
+        depth: 4
+        offset: 25         # 20 mm clear from front edge
+        end_margin: 20
+        wire_groove:
+          enabled: true
+          side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+      slides:
+        model: GTV-PK-L-H45-300-B
+        nl: 300
+      front:
+        mount: overlay      # front covers carcass edges
+        carcass_gap: 2
+        gap: 3
+        bottom_overlay: 2   # front starts 16 mm above floor; all five fronts are 164 mm high
+        top_overlay: 3      # overlap onto the shelf above the drawers
+        handle:
+          model: GOODHOME-ATOMIA-293-BLACK
+          hole_diameter: 3  # user's assumption for these handles
+          hole_depth: through
+          vertical: center
+    upper_shelves:
+      count: 1              # shelves below the common bridge, above the drawers
+      front_setback: 20
+      secondary:
+        fraction: 0.6        # 3/5 of clear height, measured from below
+        front_setback: 70
+      led_groove:
+        enabled: true
+        face: -z
+        width: 10
+        depth: 4
+        offset: 55         # 50 mm clear from front edge (axis + half width)
+        end_margin: 0
+        wire_groove:
+          enabled: true
+          side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+
+  overhead:
+    rear_confirmats:
+      enabled: true
+      rear_offset: 30       # hidden behind bridge support, under internal dividers
+    height: 760             # above the common bridge top
+    desk_columns: two_equal_tower_and_remainder
+    middle_shelf: true
+    led_groove:
+      enabled: true
+      face: -z
+      width: 10
+      depth: 4
+      offset: 55
+      end_margin: 0
+      wire_groove:
+        enabled: true
+        side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+    top_led_groove:          # one continuous underside run across all upper bays
+      enabled: true
+      face: -z
+      width: 10
+      depth: 4
+      offset: 55
+      end_margin: 18    # right end hidden above the outer side
+      end_margin_left: 0    # wall side: cable and LED grooves meet at the edge
+      wire_groove:
+        enabled: true
+        side: left
+    middle_shelf_front_setback: 20
+    desk_back:
+      enabled: true
+      rabbet:
+        width: 12
+        depth: 3.2
+        shared_width: 6
+        horizontal: true
+    bridge:
+      top: 1640             # top surface of ONE board across the lower module
+      support:
+        enabled: true
+        height: 200
+        rear_offset: 50     # furniture rear plane to support's rear face
+      led_groove:
+        enabled: true
+        face: -z
+        width: 10
+        depth: 4
+        offset: 55         # 50 mm clear from front edge (axis + half width)
+        end_margin: 15
+        end_margin_left: 0    # wall side
+        wire_groove:
+          enabled: true
+          side: left  # underside cable groove from rear to LED, 3.2 × 3 mm
+    cabinets:
+      count: 0              # optional cabinets; open shelves in this example
+      bottom: 1450
+      height: 360
+      depth: 300
+      shelf_count: 1
+
+material:
+  thickness: 18
+  back_thickness: 3
+  drawer_thickness: 18
+  drawer_bottom: 3       # HDF; drawers.bottom.type is authoritative

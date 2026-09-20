@@ -1,4 +1,6 @@
 venv/
+venv_x280/
+exports/
 __pycache__/
 *.pyc
 *.pyo

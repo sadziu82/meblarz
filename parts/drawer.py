@@ -12,13 +12,15 @@ import yaml
 
 @dataclass
 class Hole:
-    """Slide mounting hole."""
+    """Machining hole, for example for a slide or drawer handle."""
     x: float
     y: float
     z: float
     diameter: float
     depth: float
     direction: str  # surface normal: '+x','-x','+y','-y','+z','-z'
+    kind: str = 'slide'
+    through: bool = False
 
 
 @dataclass
@@ -45,6 +47,12 @@ class Board:
     joint_holes: List[JointHole] = field(default_factory=list)
     movable: bool = True        # False = carcass board (does not move on open)
     move_fraction: float = 1.0  # 0.0=fixed, 0.5=half-extension, 1.0=full (slide middle runner)
+    travel: float | None = None # own travel distance [mm], otherwise model.max_travel
+    corner_radius: float = 0.0  # front corner radius for shaped horizontal boards
+    rounded_front_corners: Tuple[bool, bool] = (False, False)  # (left, right)
+    grooves: list[dict] = field(default_factory=list)
+    fabrication: bool = True  # False for purchased equipment shown only in preview
+    yaw: float = 0.0  # preview rotation about local Z at pos, degrees
 
 
 @dataclass
@@ -56,9 +64,22 @@ class DrawerModel:
     slide_nl: int = 0
     joints: List[Tuple[str, str]] = field(default_factory=list)
     drawer_count: int = 0  # 0 = standalone drawer, >0 = dresser
+    notes: List[str] = field(default_factory=list)
 
 
 _SLIDES_DB: dict | None = None
+
+
+def _resolve_handle(config: dict | None) -> dict | None:
+    """Resolve a library handle while preserving per-project machining choices."""
+    if not config or 'model' not in config:
+        return config
+    with (Path(__file__).parent.parent / 'db' / 'handles.yaml').open() as source:
+        handles = yaml.safe_load(source)['handles']
+    model = config['model']
+    if model not in handles:
+        raise ValueError(f'Unknown handle model: {model}')
+    return {**handles[model], **config}
 
 
 def _load_slides_db() -> dict:
@@ -68,6 +89,13 @@ def _load_slides_db() -> dict:
         with open(db_path) as f:
             _SLIDES_DB = yaml.safe_load(f)['slides']
     return _SLIDES_DB
+
+
+def _require_side_slide(slide: dict) -> None:
+    if slide.get('mounting', 'side') != 'side' or not slide.get('geometry_supported', True):
+        raise ValueError(f"{slide.get('symbol', slide.get('name'))}: prowadnica dolnego montażu; "
+                         'obecny generator obsługuje prowadnice boczne. '
+                         f"Maksymalna grubość boku tego modelu: {slide.get('max_side_thickness_mm')} mm.")
 
 
 def _joint_positions(start: float, length: float,
@@ -120,10 +148,12 @@ def _mount_holes_y(slide_cfg: dict, nl: int, y_start: float) -> list[float]:
 
 def _build_drawer(
     nw: float, front_H: float, nd: float,
-    mdf: float, bot: float,
+    board_thickness: float, bot: float,
     slide_cfg: dict,
     inset: float, side_gap: float, bot_gap: float,
     target_nl: int | None = None,
+    handle: dict | None = None,
+    box_bottom_offset: float = 2,
 ) -> tuple[list[Board], list[tuple[str, str]], int]:
     """
     Calculate inner drawer geometry.
@@ -132,12 +162,13 @@ def _build_drawer(
     target_nl: if given, use this NL instead of the maximum fitting one (rule 18).
     Returns (boards, joints, nl).
     """
+    _require_side_slide(slide_cfg)
     slide_side = slide_cfg['side_clearance_mm']
     slide_rear = slide_cfg['rear_clearance_mm']
     hole_d   = slide_cfg['inner_drawer_mount']['box_hole_diameter_mm']
     hole_dep = slide_cfg['inner_drawer_mount']['hole_depth_mm']
 
-    front_D = mdf
+    front_D = board_thickness
 
     box_W_ext     = nw - 2 * slide_side
     max_box_depth = nd - (front_D + inset) - slide_rear
@@ -169,13 +200,13 @@ def _build_drawer(
     box_start_y = front_y + front_D
     box_start_x = slide_side
 
-    bottom_z = front_z + 2
+    bottom_z = front_z + box_bottom_offset
     bottom_y = box_start_y
 
     side_z = bottom_z + bot
     side_y = box_start_y
 
-    rear_y = box_start_y + box_depth - mdf
+    rear_y = box_start_y + box_depth - board_thickness
     rear_z = side_z
 
     height_mm    = slide_cfg.get('height_mm', 45)
@@ -199,10 +230,10 @@ def _build_drawer(
         color=(0.75, 0.6, 0.4, 1.0),
     ))
 
-    right_x = box_start_x + box_W_ext - mdf
+    right_x = box_start_x + box_W_ext - board_thickness
     left = Board(
         name='side_left',
-        width=mdf, height=side_H, depth=box_depth - mdf,
+        width=board_thickness, height=side_H, depth=box_depth - board_thickness,
         pos=(box_start_x, side_y, side_z),
         color=(0.7, 0.55, 0.38, 1.0),
     )
@@ -215,20 +246,20 @@ def _build_drawer(
 
     right = Board(
         name='side_right',
-        width=mdf, height=side_H, depth=box_depth - mdf,
+        width=board_thickness, height=side_H, depth=box_depth - board_thickness,
         pos=(right_x, side_y, side_z),
         color=(0.7, 0.55, 0.38, 1.0),
     )
     for hy in holes_y:
         right.holes.append(Hole(
-            x=right_x + mdf, y=hy, z=slide_hole_z,
+            x=right_x + board_thickness, y=hy, z=slide_hole_z,
             diameter=hole_d, depth=hole_dep, direction='+x',
         ))
     boards.append(right)
 
     boards.append(Board(
         name='rear',
-        width=box_W_ext, height=side_H, depth=mdf,
+        width=box_W_ext, height=side_H, depth=board_thickness,
         pos=(box_start_x, rear_y, rear_z),
         color=(0.7, 0.55, 0.38, 1.0),
     ))
@@ -237,17 +268,17 @@ def _build_drawer(
     joints: list[tuple[str, str]] = []
     JH = JointHole
 
-    x_sl = box_start_x + mdf / 2
-    x_sr = right_x + mdf / 2
-    rear_y_back = rear_y + mdf
-    rear_cy = rear_y + mdf / 2
+    x_sl = box_start_x + board_thickness / 2
+    x_sr = right_x + board_thickness / 2
+    rear_y_back = rear_y + board_thickness
+    rear_cy = rear_y + board_thickness / 2
 
-    for yp in _joint_positions(side_y, box_depth - mdf):
+    for yp in _joint_positions(side_y, box_depth - board_thickness):
         bd['bottom'].joint_holes.append(JH(x_sl, yp, bottom_z, '-z', 1, 'side_left'))
         bd['side_left'].joint_holes.append(JH(x_sl, yp, side_z, '-z', 2, 'bottom'))
     joints.append(('bottom', 'side_left'))
 
-    for yp in _joint_positions(side_y, box_depth - mdf):
+    for yp in _joint_positions(side_y, box_depth - board_thickness):
         bd['bottom'].joint_holes.append(JH(x_sr, yp, bottom_z, '-z', 1, 'side_right'))
         bd['side_right'].joint_holes.append(JH(x_sr, yp, side_z, '-z', 2, 'bottom'))
     joints.append(('bottom', 'side_right'))
@@ -268,6 +299,32 @@ def _build_drawer(
     joints.append(('bottom', 'rear'))
 
     front_back_y = front_y + front_D
+    if handle:
+        handle = _resolve_handle(handle)
+        spacing = float(handle['hole_spacing'])
+        diameter = float(handle.get('hole_diameter', 5))
+        through = handle.get('hole_depth', front_D) == 'through'
+        depth = front_D if through else float(handle.get('hole_depth', front_D))
+        through = through or depth == front_D
+        vertical = handle.get('vertical', 'offset_top')
+        if vertical not in ('center', 'offset_top'):
+            raise ValueError('handle.vertical must be center or offset_top')
+        offset_top = front_H / 2 if vertical == 'center' else float(handle.get('offset_top', 40))
+        if spacing <= 0 or spacing >= bd['front'].width:
+            raise ValueError(
+                f"Drawer handle hole_spacing ({spacing}mm) must be between 0 and "
+                f"front width ({bd['front'].width}mm)"
+            )
+        z_handle = front_z + front_H - offset_top
+        if not front_z <= z_handle <= front_z + front_H:
+            raise ValueError(f"Drawer handle offset_top ({offset_top}mm) lies outside the front")
+        for x_handle in (front_x + bd['front'].width / 2 - spacing / 2,
+                         front_x + bd['front'].width / 2 + spacing / 2):
+            bd['front'].holes.append(Hole(
+                x=x_handle, y=front_back_y, z=z_handle,
+                diameter=diameter, depth=depth, direction='+y', kind='handle', through=through,
+            ))
+
     for zp in _joint_positions(side_z, side_H):
         bd['front'].joint_holes.append(JH(x_sl, front_back_y, zp, '+y', 1, 'side_left', 'dowel'))
         bd['side_left'].joint_holes.append(JH(x_sl, side_y, zp, '-y', 2, 'front', 'dowel'))
@@ -283,6 +340,32 @@ def _build_drawer(
         bd['front'].joint_holes.append(JH(xp, front_back_y, bottom_z_center, '+y', 1, 'bottom', 'dowel'))
         bd['bottom'].joint_holes.append(JH(xp, bottom_y, bottom_z_center, '-y', 2, 'front', 'dowel'))
     joints.append(('front', 'bottom'))
+
+    if bot == 3:
+        # Thin HDF sits below the box and enters a 3 mm deep stopped front groove.
+        groove_depth = 3
+        if front_D <= groove_depth:
+            raise ValueError('Drawer front must be thicker than the bottom groove')
+        bottom = bd['bottom']
+        bottom.pos = (bottom.pos[0], bottom.pos[1]-groove_depth, bottom.pos[2])
+        bottom.depth += groove_depth
+        bd['front'].grooves.append(dict(kind='drawer_bottom', face='+y', width=bot,
+            depth=groove_depth, x=box_start_x-front_x, z=bottom_z-front_z,
+            span_x=box_W_ext, span_z=bot))
+        # Replace thick-board confirmats/dowels with small wood screws from below.
+        for board in boards:
+            board.joint_holes = [h for h in board.joint_holes
+                                 if board.name != 'bottom' and h.partner != 'bottom']
+        joints = [pair for pair in joints if 'bottom' not in pair]
+        for name, points in (
+            ('side_left', [(x_sl, yp) for yp in _joint_positions(side_y, box_depth-board_thickness)]),
+            ('side_right', [(x_sr, yp) for yp in _joint_positions(side_y, box_depth-board_thickness)]),
+            ('rear', [(xp, rear_cy) for xp in _joint_positions(box_start_x, box_W_ext)]),
+        ):
+            for xp, yp in points:
+                bottom.holes.append(Hole(xp, yp, bottom_z, 3, bot, '-z', 'wood_screw', True))
+                bd[name].holes.append(Hole(xp, yp, side_z, 2, 13, '-z', 'wood_screw_pilot'))
+            joints.append(('bottom', name))
 
     # ── Slide body visualisation (3-part: outer / middle / inner) ────────────
     part_w = slide_side / 3.0
@@ -321,22 +404,30 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
             width=b.width, height=b.height, depth=b.depth,
             pos=(b.pos[0] + dx, b.pos[1] + dy, b.pos[2] + dz),
             color=b.color,
-            holes=[Hole(h.x+dx, h.y+dy, h.z+dz, h.diameter, h.depth, h.direction)
+            holes=[Hole(h.x+dx, h.y+dy, h.z+dz, h.diameter, h.depth, h.direction, h.kind, h.through)
                    for h in b.holes],
             joint_holes=[JointHole(jh.x+dx, jh.y+dy, jh.z+dz,
                                    jh.direction, jh.element, jh.partner, jh.hole_type)
                          for jh in b.joint_holes],
             movable=b.movable,
             move_fraction=b.move_fraction,
+            travel=b.travel,
+            corner_radius=b.corner_radius,
+            rounded_front_corners=b.rounded_front_corners,
+            grooves=list(b.grooves),
+            fabrication=b.fabrication,
+            yaw=b.yaw,
         ))
     return result
 
 
 def _center_model(boards: list[Board]) -> list[Board]:
     """Centre the model in X and Y; place the bottom face at Z=0 (floor)."""
-    xs = [b.pos[0] for b in boards] + [b.pos[0] + b.width  for b in boards]
-    ys = [b.pos[1] for b in boards] + [b.pos[1] + b.depth  for b in boards]
-    zs = [b.pos[2] for b in boards] + [b.pos[2] + b.height for b in boards]
+    # Preview equipment must not move the furniture coordinate origin.
+    bounds = [b for b in boards if b.fabrication] or boards
+    xs = [b.pos[0] for b in bounds] + [b.pos[0] + b.width  for b in bounds]
+    ys = [b.pos[1] for b in bounds] + [b.pos[1] + b.depth  for b in bounds]
+    zs = [b.pos[2] for b in bounds] + [b.pos[2] + b.height for b in bounds]
     cx = (min(xs) + max(xs)) / 2
     cy = (min(ys) + max(ys)) / 2
     cz = min(zs)   # bottom of model at Z=0 (floor)
@@ -351,7 +442,7 @@ def load_drawer(path: str) -> DrawerModel:
     nh = cfg['niche']['height']
     nd = cfg['niche']['depth']
 
-    mdf = cfg['material']['thickness']
+    board_thickness = cfg['material']['thickness']
     bot = cfg['material']['bottom_thickness']
 
     slide_model_id = cfg['slides']['model']
@@ -368,14 +459,15 @@ def load_drawer(path: str) -> DrawerModel:
 
     front_H = nh - top_gap - bot_gap
 
-    boards, joints, nl = _build_drawer(nw, front_H, nd, mdf, bot, slide_cfg,
+    boards, joints, nl = _build_drawer(nw, front_H, nd, board_thickness, bot, slide_cfg,
                                        inset, side_gap, bot_gap,
-                                       target_nl=target_nl)
+                                       target_nl=target_nl,
+                                       handle=cfg['front'].get('handle'))
     boards = _center_model(boards)
 
     return DrawerModel(
         boards=boards,
-        max_travel=float(nl),
+        max_travel=float(slide_cfg.get('travel_mm', nl)),
         slide_model=slide_model_id,
         slide_nl=nl,
         joints=joints,

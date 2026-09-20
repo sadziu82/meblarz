@@ -1,0 +1,119 @@
+# Desk wall with a drawer tower. All dimensions are millimetres.
+desk_drawer_wall:
+  height: 2400             # derived from bridge.top + overhead.height
+
+  desk:
+    width: 1350
+    width_mode: desktop     # actual desktop width, excluding left side
+    depth: 600
+    underside_height: 845   # desktop top = 863 with 18 mm board
+    left_side:
+      depth: 300            # same depth as the drawer tower
+    corner_rounding:
+      sides: right           # none | left | right | both (front corners)
+      radius: 200
+    led_groove:
+      enabled: true
+      face: -z
+      width: 12
+      depth: 4
+      offset: 30
+    keyboard_tray:
+      enabled: true
+      width: 900
+      depth: 350
+      drop: 120             # lower than desk top
+      position: center      # center | offset
+      offset_left: 250      # used in offset mode: inner left side -> tray left edge
+      offset_front: 0
+      slides:
+        model: GTV-H45
+        nl: 350
+      travel: 250
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+    back:
+      enabled: false        # HDF panel behind the desk
+    low_shelf:
+      enabled: true
+      span: full            # full | partial
+      side: left            # used for partial shelves
+      height: 80
+      depth: 180
+      supports: 2           # 1 = centre; 2 = axes at 1/3 and 2/3 of shelf width
+
+  drawer_tower:
+    width: 600
+    depth: 300
+    back:
+      enabled: true
+      rabbet:
+        width: 10           # overlap into each rear side edge
+        depth: 3            # flush with the rear face
+    drawers:
+      count: 4
+      align_top_to_desk: true # shelf above drawers flush with desktop
+      rail_depth: 100
+      rail_thickness: 18
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+      slides:
+        model: GTV-H45
+      front:
+        mount: overlay      # front covers carcass edges
+        carcass_gap: 2
+        gap: 3
+        inset: 1.5
+        side_gap: 3
+        bottom_gap: 3
+        top_gap: 50
+        handle:
+          hole_spacing: 160
+          hole_diameter: 5
+          hole_depth: 18
+          offset_top: 35
+    upper_shelves:
+      count: 1              # shelves below the common bridge, above the drawers
+      front_setback: 20
+      secondary:
+        fraction: 0.6666666666666666
+        front_setback: 70
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+
+  overhead:
+    height: 760             # above the common bridge top
+    desk_columns: two_equal_tower_and_remainder
+    middle_shelf: true
+    bridge:
+      top: 1640             # top surface of ONE board across the lower module
+      led_groove:
+        enabled: true
+        face: -z
+        width: 12
+        depth: 4
+        offset: 20
+    cabinets:
+      count: 0              # optional cabinets; open shelves in this example
+      bottom: 1450
+      height: 360
+      depth: 300
+      shelf_count: 1
+
+material:
+  thickness: 18
+  back_thickness: 3
+  drawer_thickness: 18
+  drawer_bottom: 18

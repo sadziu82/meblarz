@@ -127,7 +127,7 @@ class TestCarcassDimensions:
         assert bd['carcass_bottom'].depth    == pytest.approx(CD)
 
     def test_carcass_top_bottom_thickness(self, bd):
-        """Wierzch i spód mają grubość MDF=18mm."""
+        """Wierzch i spód mają grubość płyty=18mm."""
         assert bd['carcass_top'].height == pytest.approx(THICK)
         assert bd['carcass_bottom'].height    == pytest.approx(THICK)
 

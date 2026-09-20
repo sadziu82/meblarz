@@ -1,0 +1,42 @@
+handles:
+  GTV-UA-337-320-ALUMINIUM:
+    name: GTV UA-337 320 mm aluminium
+    manufacturer: GTV
+    symbol: UA-00-337320
+    source: https://gtv.com.pl/produkt/UA-00-337320/
+    length_mm: 340
+    height_mm: 25
+    projection_mm: 26.5
+    material: aluminium
+    finish: anodized aluminium
+    hole_spacing: 320
+    hole_diameter: 5        # project clearance bore
+    hole_depth: through
+  GTV-UA-337-160-BLACK:
+    name: GTV UA-337 160 mm black matt
+    manufacturer: GTV
+    symbol: UA-00-337160-20M
+    source: https://gtv.com.pl/produkt/UA-00-337160-20M/
+    length_mm: 180
+    height_mm: 25
+    projection_mm: 26.5
+    material: aluminium
+    finish: black matt
+    hole_spacing: 160
+    hole_diameter: 5        # project clearance bore
+    hole_depth: through
+  GOODHOME-ATOMIA-293-BLACK:
+    name: GoodHome Atomia 293 mm black
+    manufacturer: GoodHome
+    ean: '5059340008448'
+    source: https://www.castorama.pl/uchwyt-plaski-goodhome-atomia-29-3-cm-czarny-2-szt-/5059340008448_CAPL.prd
+    length_mm: 293
+    height_mm: 23
+    projection_mm: 20.5
+    material: steel
+    finish: black
+    pack_quantity: 2
+    hole_spacing: 256
+    # Project drill clearance, not a published manufacturer bore specification.
+    hole_diameter: 5
+    hole_depth: through

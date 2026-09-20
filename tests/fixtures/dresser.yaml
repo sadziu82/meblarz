@@ -10,10 +10,10 @@ carcass:
   placement: builtin_both   # 'freestanding' | 'builtin_left' | 'builtin_right' | 'builtin_both'
 
 material:
-  thickness:        18   # MDF 18mm – wierzch, spód, boki korpusu
+  thickness:        18   # płyta meblowa 18mm – wierzch, spód, boki korpusu
   back_thickness:    0   # tył otwarty (zasada 3: szafka z szufladami)
-  drawer_thickness: 18   # MDF 18mm – elementy skrzynki szuflady
-  drawer_bottom:    18   # MDF 18mm – dno skrzynki szuflady
+  drawer_thickness: 18   # płyta meblowa 18mm – elementy skrzynki szuflady
+  drawer_bottom:    18   # płyta meblowa 18mm – dno skrzynki szuflady
 
 plinth:
   height:      170   # wysokość cokołu [mm]; 0 = brak cokołu (szafka stoi na spodzie)
@@ -22,7 +22,7 @@ plinth:
 
 rail:                    # poprzeczka między szufladami (z rowkiem na taśmę LED)
   depth:      100        # głębokość poprzeczki [mm] (reszta głębokości otwarta)
-  thickness:   18        # MDF 18mm
+  thickness:   18        # płyta meblowa 18mm
   led_groove:
     width:    12         # szerokość rowka [mm]
     depth:     4         # głębokość rowka [mm]

@@ -15,10 +15,14 @@ Keyboard shortcuts:
     2×Esc / Ctrl+Q  quit
 """
 
+import atexit
+import os
 import sys
 import re
 import math
 import time
+import termios
+import tty
 from pathlib import Path
 
 import numpy as np
@@ -26,9 +30,9 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QMessageBox,
     QDialog, QVBoxLayout, QLabel,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QEvent, QSocketNotifier, Qt, QTimer
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtGui import QSurfaceFormat, QKeySequence, QShortcut, QFont
+from PyQt6.QtGui import QFont, QKeyEvent, QKeySequence, QShortcut, QSurfaceFormat
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -36,6 +40,7 @@ from OpenGL.GLU import *
 import yaml as _yaml
 from parts.drawer import DrawerModel, Board, Hole, JointHole, load_drawer
 from parts.dresser import load_dresser as load_komoda
+from parts.desk_drawer_wall import load_desk_drawer_wall
 
 
 def _load_config() -> dict:
@@ -60,10 +65,140 @@ def _cfg(key: str, default):
 _CFG = _load_config()
 
 
+# Terminal escape sequences emitted by common SSH terminal emulators.
+_TERMINAL_KEYS = {
+    b'\x1b[A':    (Qt.Key.Key_Up,    Qt.KeyboardModifier.NoModifier),
+    b'\x1b[B':    (Qt.Key.Key_Down,  Qt.KeyboardModifier.NoModifier),
+    b'\x1b[C':    (Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier),
+    b'\x1b[D':    (Qt.Key.Key_Left,  Qt.KeyboardModifier.NoModifier),
+    b'\x1b[1;2A': (Qt.Key.Key_Up,    Qt.KeyboardModifier.ShiftModifier),
+    b'\x1b[1;2B': (Qt.Key.Key_Down,  Qt.KeyboardModifier.ShiftModifier),
+    b'\x1b[1;2C': (Qt.Key.Key_Right, Qt.KeyboardModifier.ShiftModifier),
+    b'\x1b[1;2D': (Qt.Key.Key_Left,  Qt.KeyboardModifier.ShiftModifier),
+    b'\x1b[1;5A': (Qt.Key.Key_Up,    Qt.KeyboardModifier.ControlModifier),
+    b'\x1b[1;5B': (Qt.Key.Key_Down,  Qt.KeyboardModifier.ControlModifier),
+    b'\x1b[H':    (Qt.Key.Key_Home,  Qt.KeyboardModifier.NoModifier),
+    b'\x1bOH':    (Qt.Key.Key_Home,  Qt.KeyboardModifier.NoModifier),
+    b'\x1b[1~':   (Qt.Key.Key_Home,  Qt.KeyboardModifier.NoModifier),
+}
+
+_TERMINAL_CHAR_KEYS = {
+    ord('+'): Qt.Key.Key_Plus,
+    ord('='): Qt.Key.Key_Equal,
+    ord('-'): Qt.Key.Key_Minus,
+    ord('p'): Qt.Key.Key_P,
+    ord('P'): Qt.Key.Key_P,
+    ord('n'): Qt.Key.Key_N,
+    ord('N'): Qt.Key.Key_N,
+    ord('h'): Qt.Key.Key_H,
+    ord('H'): Qt.Key.Key_H,
+    ord('q'): Qt.Key.Key_Q,
+    ord('Q'): Qt.Key.Key_Q,
+    ord('w'): Qt.Key.Key_W,
+    ord('W'): Qt.Key.Key_W,
+    ord('s'): Qt.Key.Key_S,
+    ord('S'): Qt.Key.Key_S,
+    ord('a'): Qt.Key.Key_A,
+    ord('A'): Qt.Key.Key_A,
+    ord('d'): Qt.Key.Key_D,
+    ord('D'): Qt.Key.Key_D,
+    0x0F:     Qt.Key.Key_O,  # Ctrl+O
+    0x11:     Qt.Key.Key_Q,  # Ctrl+Q
+    0x12:     Qt.Key.Key_R,  # Ctrl+R
+}
+
+
+class TerminalInput:
+    """Feed keystrokes from the SSH terminal into the Qt window."""
+
+    def __init__(self, window: QMainWindow):
+        self.window = window
+        self._buffer = bytearray()
+        self._saved_termios = None
+        self._notifier = None
+        self._escape_timer = QTimer(window)
+        self._escape_timer.setSingleShot(True)
+        self._escape_timer.timeout.connect(self._flush_escape)
+
+        try:
+            self._fd = sys.stdin.fileno()
+        except (AttributeError, OSError):
+            return
+        if not os.isatty(self._fd):
+            return
+
+        self._saved_termios = termios.tcgetattr(self._fd)
+        tty.setcbreak(self._fd)
+        self._notifier = QSocketNotifier(self._fd, QSocketNotifier.Type.Read, window)
+        self._notifier.activated.connect(self._read)
+        atexit.register(self.close)
+        print('Sterowanie z terminala: strzałki, Shift/Ctrl+strzałki, +/-, P, N, H, Home.')
+
+    def close(self):
+        if self._notifier is not None:
+            self._notifier.setEnabled(False)
+            self._notifier = None
+        if self._saved_termios is not None:
+            termios.tcsetattr(self._fd, termios.TCSADRAIN, self._saved_termios)
+            self._saved_termios = None
+
+    def _read(self):
+        try:
+            data = os.read(self._fd, 1024)
+        except BlockingIOError:
+            return
+        if not data:
+            self.close()
+            return
+        self._buffer.extend(data)
+        self._process_buffer()
+
+    def _send(self, key, modifiers=Qt.KeyboardModifier.NoModifier):
+        self.window.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, modifiers))
+
+    def _process_buffer(self):
+        while self._buffer:
+            for sequence in sorted(_TERMINAL_KEYS, key=len, reverse=True):
+                if self._buffer.startswith(sequence):
+                    key, modifiers = _TERMINAL_KEYS[sequence]
+                    del self._buffer[:len(sequence)]
+                    self._escape_timer.stop()
+                    self._send(key, modifiers)
+                    break
+            else:
+                if self._buffer[0] == 0x1B:
+                    if any(sequence.startswith(self._buffer) for sequence in _TERMINAL_KEYS):
+                        self._escape_timer.start(100)
+                        return
+                    del self._buffer[0]
+                    self._send(Qt.Key.Key_Escape)
+                    continue
+
+                char = self._buffer.pop(0)
+                key = _TERMINAL_CHAR_KEYS.get(char)
+                if key is None:
+                    continue
+                modifiers = Qt.KeyboardModifier.ControlModifier if char in (0x0F, 0x11, 0x12) else Qt.KeyboardModifier.NoModifier
+                self._send(key, modifiers)
+                continue
+            continue
+
+    def _flush_escape(self):
+        if self._buffer and self._buffer[0] == 0x1B:
+            del self._buffer[0]
+            self._send(Qt.Key.Key_Escape)
+            self._process_buffer()
+
+
 def _movable_group(board: Board) -> str:
     """Return the movable-group key (e.g. 'drawer_0') or 'default' for standalone drawers."""
     m = re.match(r'^(drawer_\d+)_', board.name)
-    return m.group(1) if m else 'default'
+    if m:
+        return m.group(1)
+    m = re.match(r'^(tower_drawer_\d+)_', board.name)
+    if m:
+        return m.group(1)
+    return 'keyboard_tray' if board.name.startswith('keyboard_tray') else 'default'
 
 
 def _ray_aabb(ro, rd, bmin, bmax):
@@ -102,9 +237,11 @@ _SHORTCUTS = [
     ("View", [
         ("Home",               "reset view"),
         ("P",                  "toggle perspective / ortho"),
+        ("←→↑↓",              "pan"),
         ("Shift + ←→↑↓",      "rotate"),
-        ("↑↓←→",              "pan"),
         ("Ctrl + ↑ / ↓",      "zoom in / out"),
+        ("A / D",              "rotate left / right"),
+        ("W / S",              "rotate up / down"),
         ("Scroll wheel",       "zoom"),
         ("N",                  "dimensions of selected (next: +holes)"),
     ]),
@@ -112,7 +249,7 @@ _SHORTCUTS = [
         ("Left drag",          "rotate"),
         ("Right drag",         "pan (axis lock)"),
         ("Left click",         "select board"),
-        ("Ctrl + left click",  "open / close movable element"),
+        ("Ctrl + left click / double click", "open / close movable element"),
     ]),
     ("Drawers", [
         ("+ / -",              "open / close all"),
@@ -189,6 +326,11 @@ class GLWidget(QOpenGLWidget):
         self._last_pos  = None
         self._press_pos = None
         self._pan_axis: str | None = None
+        self._pending_click_pos: tuple[int, int] | None = None
+        self._suppress_click_release = False
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.timeout.connect(self._finish_single_click)
         self._open_per_group: dict[str, float] = {}
         self._board_group_keys: list[str] = []
         self._model_center_z: float = 0.0
@@ -332,14 +474,37 @@ class GLWidget(QOpenGLWidget):
             if not b.movable:
                 return 0.0
             key = self._board_group_keys[_bidx[id(b)]]
-            return self.model.max_travel * self._open_per_group.get(key, 0.0) * b.move_fraction
+            travel = self.model.max_travel if b.travel is None else b.travel
+            return travel * self._open_per_group.get(key, 0.0) * b.move_fraction
 
         def draw_body(b, alpha):
             r, g, bv, _ = b.color
             glPushMatrix()
             glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
+            glRotatef(b.yaw, 0, 0, 1)
             glColor4f(r, g, bv, alpha)
-            self._draw_box(b.width, b.depth, b.height)
+            rabbets = [g for g in b.grooves if g['kind'] in ('back_rabbet', 'drawer_bottom')]
+            if rabbets:
+                depth = rabbets[0]['depth']
+                self._draw_box(b.width, b.depth - depth, b.height)
+                # Split the rear layer at every machining boundary; omit cut cells.
+                xs = sorted({0, b.width, *[v for q in rabbets for v in (q['x'], q['x'] + q['span_x'])]})
+                zs = sorted({0, b.height, *[v for q in rabbets for v in (q['z'], q['z'] + q['span_z'])]})
+                for x1, x2 in zip(xs, xs[1:]):
+                    for z1, z2 in zip(zs, zs[1:]):
+                        if any(q['x'] <= (x1+x2)/2 <= q['x']+q['span_x'] and
+                               q['z'] <= (z1+z2)/2 <= q['z']+q['span_z'] for q in rabbets):
+                            continue
+                        glPushMatrix()
+                        glTranslatef(x1, b.depth - depth, z1)
+                        glColor4f(r, g, bv, alpha)
+                        self._draw_box(x2-x1, depth, z2-z1)
+                        glPopMatrix()
+            elif b.corner_radius > 0 and any(b.rounded_front_corners):
+                self._draw_rounded_box(b.width, b.depth, b.height, b.corner_radius,
+                                       b.rounded_front_corners)
+            else:
+                self._draw_box(b.width, b.depth, b.height)
             glPopMatrix()
 
         def draw_slide_holes(b):
@@ -348,9 +513,40 @@ class GLWidget(QOpenGLWidget):
             for h in b.holes:
                 glPushMatrix()
                 glTranslatef(h.x - b.pos[0], h.y - b.pos[1], h.z - b.pos[2])
-                self._draw_hole(h.direction, h.diameter, h.depth)
+                self._draw_hole(h.direction, h.diameter, h.depth, h.through)
                 glPopMatrix()
             glPopMatrix()
+
+        def draw_grooves(b):
+            glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glDepthMask(GL_FALSE)
+            glPushMatrix()
+            glTranslatef(b.pos[0], b.pos[1]-_t(b), b.pos[2])
+            glRotatef(b.yaw, 0, 0, 1)
+            for groove in b.grooves:
+                depth = groove['depth']
+                if groove['kind'] in ('back_rabbet', 'drawer_bottom'):
+                    pos = (groove['x'], b.depth-depth, groove['z'])
+                    size = (groove['span_x'], depth+0.3, groove['span_z'])
+                elif groove['kind'] == 'led_wire':
+                    pos = (groove['x'], groove['y'], b.height-depth if groove['face'] == '+z' else -0.3)
+                    size = (groove['span_x'], groove['span_y'], depth+0.3)
+                elif groove['kind'] == 'led' and groove['face'] in ('+z', '-z'):
+                    y1 = max(0, groove['offset']-groove['width']/2)
+                    y2 = min(b.depth, groove['offset']+groove['width']/2)
+                    pos = (groove.get('x', 0), y1, b.height-depth if groove['face'] == '+z' else -0.3)
+                    size = (groove.get('span_x', b.width), y2-y1, depth+0.3)
+                else:
+                    continue
+                glPushMatrix()
+                glTranslatef(*pos)
+                glColor4f(1, 0.05, 0.05, 0.65)
+                self._draw_box(*size)
+                glPopMatrix()
+            glPopMatrix()
+            glPopAttrib()
 
         def draw_joint_holes(b, filter_partner=None):
             glPushMatrix()
@@ -388,6 +584,8 @@ class GLWidget(QOpenGLWidget):
             for i in others:
                 draw_joint_holes(boards[i], filter_partner=sel_name)
 
+        for b in boards:
+            draw_grooves(b)
         self._draw_grid()
 
     def _draw_box(self, w, d, h):
@@ -412,8 +610,54 @@ class GLWidget(QOpenGLWidget):
         glEnd()
         glEnable(GL_LIGHTING)
 
-    def _draw_hole(self, direction, diameter, depth):
-        surface_r = 1.5; tip_r = 0.0; overshoot = 0.3
+    def _draw_rounded_box(self, w, d, h, radius, rounded):
+        """Draw a board with optional rounded front-left and front-right corners."""
+        left, right = rounded
+        r = min(radius, w / 2, d)
+        outline = [(0, d)]
+        if left:
+            outline.append((0, r))
+            for step in range(1, 9):
+                angle = math.pi + step * math.pi / 16
+                outline.append((r + r * math.cos(angle), r + r * math.sin(angle)))
+        else:
+            outline.append((0, 0))
+        if right:
+            outline.append((w - r, 0))
+            for step in range(1, 9):
+                angle = -math.pi / 2 + step * math.pi / 16
+                outline.append((w - r + r * math.cos(angle), r + r * math.sin(angle)))
+        else:
+            outline.append((w, 0))
+        outline.append((w, d))
+
+        glNormal3f(0, 0, 1); glBegin(GL_POLYGON)
+        for x, y in outline: glVertex3f(x, y, h)
+        glEnd()
+        glNormal3f(0, 0, -1); glBegin(GL_POLYGON)
+        for x, y in reversed(outline): glVertex3f(x, y, 0)
+        glEnd()
+        glBegin(GL_QUADS)
+        for index, (x1, y1) in enumerate(outline):
+            x2, y2 = outline[(index + 1) % len(outline)]
+            dx, dy = x2 - x1, y2 - y1
+            length = math.hypot(dx, dy)
+            glNormal3f(dy / length, -dx / length, 0)
+            glVertex3f(x1, y1, 0); glVertex3f(x2, y2, 0)
+            glVertex3f(x2, y2, h); glVertex3f(x1, y1, h)
+        glEnd()
+        glLineWidth(1.0); glDisable(GL_LIGHTING); glColor3f(0.2, 0.15, 0.1)
+        glBegin(GL_LINE_LOOP)
+        for x, y in outline: glVertex3f(x, y, 0)
+        glEnd(); glBegin(GL_LINE_LOOP)
+        for x, y in outline: glVertex3f(x, y, h)
+        glEnd(); glBegin(GL_LINES)
+        for x, y in outline:
+            glVertex3f(x, y, 0); glVertex3f(x, y, h)
+        glEnd(); glEnable(GL_LIGHTING)
+
+    def _draw_hole(self, direction, diameter, depth, through=False):
+        surface_r = diameter / 2; tip_r = surface_r if through else 0.0; overshoot = 0.3
         _rot = {'-x':(90,0,1,0),'+x':(-90,0,1,0),'-y':(-90,1,0,0),'+y':(90,1,0,0),'-z':(0,1,0,0),'+z':(180,1,0,0)}
         _off = {'-x':(-overshoot,0,0),'+x':(overshoot,0,0),'-y':(0,-overshoot,0),'+y':(0,overshoot,0),'-z':(0,0,-overshoot),'+z':(0,0,overshoot)}
         angle,ax,ay,az = _rot[direction]; ox,oy,oz = _off[direction]
@@ -424,6 +668,11 @@ class GLWidget(QOpenGLWidget):
         q = gluNewQuadric(); gluQuadricNormals(q, GLU_SMOOTH)
         gluDisk(q, 0, surface_r, 16, 1)
         gluCylinder(q, surface_r, tip_r, depth+overshoot, 16, 1)
+        if through:
+            # The board is opaque: show the exit on its opposite face too.
+            # Local +Z points into the material; step just past the exit face.
+            glTranslatef(0, 0, depth + 2 * overshoot)
+            gluDisk(q, 0, surface_r, 24, 1)
         gluDeleteQuadric(q)
         glPopMatrix()
 
@@ -526,14 +775,47 @@ class GLWidget(QOpenGLWidget):
             dp = e.position() - self._press_pos
             if dp.x()**2 + dp.y()**2 < 25:
                 px, py = int(e.position().x()), int(e.position().y())
-                if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                if self._suppress_click_release:
+                    # The release completing a double-click must not become a
+                    # separate single-click selection.
+                    self._suppress_click_release = False
+                elif e.modifiers() & Qt.KeyboardModifier.ControlModifier:
                     idx = self._pick_idx(px, py)
                     if idx is not None and self.model and self.model.boards[idx].movable:
                         if isinstance(self.parent(), QMainWindow):
                             self.parent()._toggle_group(self._board_group_keys[idx])
                 else:
-                    self._pick(px, py)
+                    # Wait for Qt's double-click interval before selecting.  A
+                    # double-click cancels this pending single-click below.
+                    self._pending_click_pos = (px, py)
+                    self._click_timer.start(QApplication.styleHints().mouseDoubleClickInterval())
         self._last_pos = None; self._press_pos = None
+
+    def mouseDoubleClickEvent(self, e):
+        """Toggle a drawer without relying on a Ctrl modifier from the VNC client."""
+        if e.button() != Qt.MouseButton.LeftButton:
+            super().mouseDoubleClickEvent(e)
+            return
+        self._click_timer.stop()
+        self._pending_click_pos = None
+        self._suppress_click_release = True
+        idx = self._pick_idx(int(e.position().x()), int(e.position().y()))
+        if idx is not None and self.model and self.model.boards[idx].movable:
+            if isinstance(self.parent(), QMainWindow):
+                self.parent()._toggle_group(self._board_group_keys[idx])
+
+    def _finish_single_click(self):
+        if self._pending_click_pos is not None:
+            self._pick(*self._pending_click_pos)
+        self._pending_click_pos = None
+
+    def keyPressEvent(self, e):
+        """Keep application shortcuts working while the OpenGL view has focus."""
+        if isinstance(self.parent(), QMainWindow):
+            self.parent().keyPressEvent(e)
+            e.accept()
+        else:
+            super().keyPressEvent(e)
 
     def _pick_idx(self, px, py) -> "int | None":
         if self._mv_mat is None or not self.model:
@@ -551,12 +833,17 @@ class GLWidget(QOpenGLWidget):
         for i, b in enumerate(self.model.boards):
             if b.movable:
                 key  = self._board_group_keys[i]
-                trvl = self.model.max_travel * self._open_per_group.get(key, 0.0) * b.move_fraction
+                travel = self.model.max_travel if b.travel is None else b.travel
+                trvl = travel * self._open_per_group.get(key, 0.0) * b.move_fraction
             else:
                 trvl = 0.0
             bmin = np.array([b.pos[0],        b.pos[1]-trvl,         b.pos[2]])
             bmax = np.array([b.pos[0]+b.width, b.pos[1]-trvl+b.depth, b.pos[2]+b.height])
-            t = _ray_aabb(ro, rd, bmin, bmax)
+            angle = math.radians(b.yaw)
+            c, s = math.cos(angle), math.sin(angle)
+            inverse = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+            t = _ray_aabb(inverse @ (ro-bmin), inverse @ rd,
+                          np.zeros(3), np.array([b.width, b.depth, b.height]))
             if t is not None and t < best_t:
                 best_t, best_i = t, i
         return best_i
@@ -677,6 +964,20 @@ class MainWindow(QMainWindow):
         if k == Key.Key_Minus:
             self._adjust_all(-5); return
 
+        # WASD → rotate
+        if k == Key.Key_W:
+            self.gl.rot_x -= ROT_STEP
+            self.gl.update(); return
+        if k == Key.Key_S:
+            self.gl.rot_x += ROT_STEP
+            self.gl.update(); return
+        if k == Key.Key_A:
+            self.gl.rot_y -= ROT_STEP
+            self.gl.update(); return
+        if k == Key.Key_D:
+            self.gl.rot_y += ROT_STEP
+            self.gl.update(); return
+
         # Arrow keys
         if k not in (Key.Key_Left, Key.Key_Right, Key.Key_Up, Key.Key_Down):
             super().keyPressEvent(e); return
@@ -747,7 +1048,9 @@ class MainWindow(QMainWindow):
         try:
             with open(path) as f:
                 keys = _yaml.safe_load(f).keys()
-            if 'carcass' in keys:
+            if 'desk_drawer_wall' in keys:
+                model = load_desk_drawer_wall(path)
+            elif 'carcass' in keys:
                 model = load_komoda(path)
             else:
                 model = load_drawer(path)
@@ -797,7 +1100,11 @@ def main():
     app.setStyle('Fusion')
 
     win = MainWindow(yaml_path)
-    sys.exit(app.exec())
+    terminal = TerminalInput(win)
+    try:
+        sys.exit(app.exec())
+    finally:
+        terminal.close()
 
 
 if __name__ == '__main__':
