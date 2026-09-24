@@ -23,10 +23,147 @@ venv/bin/pip install PyQt6 PyOpenGL PyOpenGL_accelerate numpy PyYAML
 venv/bin/python viewer.py projects/drawer.yaml
 venv/bin/python viewer.py projects/dresser.yaml
 venv/bin/python viewer.py projects/desk_drawer_wall.yaml
+venv/bin/python viewer.py projects/kitchen_tall_unit.yaml
 ```
 
 Model type is detected automatically from YAML keys (`niche` → drawer, `carcass` → dresser,
-`desk_drawer_wall` → desk wall with drawer tower).
+`desk_drawer_wall` → desk wall with drawer tower, `kitchen_tall_unit` → two-column kitchen tall unit).
+
+## Kitchen tall unit
+
+`kitchen_tall_unit.panels.top` and `.bottom` independently select `shared`
+(one full-width board) or `separate` (one board per column). All four combinations
+are supported. The project selects `shared` for both: two 1350 × 610 × 18 mm
+boards. Omitting the settings preserves the older shared top and separate bottoms.
+Each column keeps its own side boards and four adjustable legs in either mode.
+
+`kitchen_tall_unit.fridge_ventilation` sets the rear ventilation opening at the
+plinth, bottom, divider above the fridge, and top independently. Defaults are
+500 × 40 mm; `guide.width`/`guide.depth` default to 3.2 × 2 mm. The cut-list
+boards remain rectangular. A groove marks a contour segment only when its axis
+is at most `guide.max_edge_offset` (default 50 mm) from a parallel edge.
+Otherwise shallow Ø3 × 2 mm holes mark that segment about every 20 mm, starting
+and ending 5 mm from its ends. Default openings have two grooved and two drilled
+segments on the plinth, and one grooved and two drilled segments on each
+horizontal board. The marked interior must be cut out separately after the
+rectangular boards are ordered; marks alone do not make an air passage. A
+separate furniture-board back closes the upper
+cabinet ahead of the 40 mm rear channel (`upper_back`); its thickness follows
+`material.thickness` unless overridden. `upper_back.clearance` keeps its rear
+face 10 mm ahead of the ventilation opening by default. The guide geometry is
+also recorded in the drilling sheet and DXF when production export is allowed.
+
+`projects/kitchen_tall_unit.yaml` is a separate two-column appliance cabinet:
+left side is a Samsung BRB38G705DWWEF refrigerator niche with a lift-up cabinet
+above it; right side has three configurable overlay drawer fronts, an Electrolux
+EOE7C31Z oven niche, an Electrolux EMS4253TMK microwave niche, and a two-door
+upper cabinet without a vertical partition. The supplied starting dimensions are
+2420 × 1350 × 610 mm with a 100 mm plinth, 714 mm left clear width and a
+600 mm wide right carcass. `plinth.inset_front: 10` recesses only the plinth's
+front edge; its side boards still reach the cabinet's rear plane.
+
+Appliance boards are preview-only. The Samsung product sheet gives an appliance
+envelope of 690 × 1935 × 550 mm and a 714 × 1940 × 580 mm niche. The Electrolux
+oven installation niche is 560 × 590 × 550 mm and the appliance fascia is
+596 × 594 mm. The microwave niche is 560 × 380 × 550 mm and its fascia is
+595 × 388 mm. Its total depth is 377 mm (20 mm fascia plus 357 mm behind
+the carcass front); the 550 mm niche is installation space, not body depth.
+These values are held in the appliance-model library in
+`parts/kitchen_tall_unit.py`: YAML selects `model`, and the vertical layout is
+calculated from the selected model, board thickness and furniture-front reveals.
+Appliance installation clearances and fascia offsets belong to the model library;
+they cannot be overridden in the project. Each Electrolux model records its
+installation manual and page. The oven overlap is derived from its fascia top
+and niche height (594 − 590 = 4 mm).
+
+The generator derives carcass joints from panel contacts, not from a list of
+named plates or manually entered hole coordinates. `parts/joinery.py` is shared
+geometry code; `kitchen_tall_unit.joinery` selects hidden/visible fasteners,
+end-panel joints, edge distances and maximum spacing. Gaps greater than
+`dowel_between_confirmats_above` (default 200 mm) between adjacent confirmats
+automatically receive a midpoint dowel with paired blind bores. The default uses confirmats
+on hidden faces and dowels on exposed cheeks. A plinth is a separate assembly,
+attached to the legs with clips; it is not screwed through the cabinet bottom.
+The eight selected Emuca Bone 2024417 legs use four 64 × 64 mm fixing centres
+each. The underside of the bottom panel receives Ø2.5 × 12 mm pilot bores for
+Ø4 wood screws; this pilot size is a project choice. The plinth-clip fixing
+still needs a selected mounting method. Emuca specifies 40 kg per leg and a
+100 kg tested module load; verify the filled tall cabinet's load before buying.
+Both shared/separate top/bottom modes generate their own matching bores.
+`kitchen_tall_unit.joinery.column_ties` adds aligned Ø3 through-bores in both
+adjoining column cheeks. By default four evenly spaced levels run from 100 mm above
+the lower panel to 100 mm below the upper panel, 500–800 mm apart, with two
+bores per level at 100 mm from the front and 100 mm from the rear. The YAML
+controls the offsets, spacing and diameter. Select a suitable through-fastener
+and its retainer for the two-board joint.
+The same rule applies to every pair of touching independent carcasses whose
+outer side boards are tagged by the generator; internal dividers are excluded.
+
+Drawer and hinge templates live in `db/drawer_systems.yaml` and `db/hinges.yaml`.
+The three Axis Pro variants are D/B/A (`PB-AXISPRO-KPL600D/B/A`): purchased metal
+side heights are 200/120/86 mm, while cut rear heights are 199/116/84 mm.
+For clear width LW and nominal length NL, the 16 mm bottom is `(LW-75) × (NL-24)`
+and the 16 mm rear is `(LW-87) × rear_height`. Here bottoms are 489 × 576 mm,
+rears 477 mm wide. NL+10 is the required installation depth, not the bottom size.
+The chosen GTV circular runner holes are at 37/261/389 mm for NL600; other supported
+lengths select their own pattern. Front/rear connector pilots are Ø2 × 12 mm.
+Runner pilots Ø3 × 12 mm are a project choice for wood screws. Metal telescoping
+profiles are simplified preview geometry, excluded from cutting; their fixed
+parts stay in the cabinet when a drawer opens. GTV recommends extra railing for
+the 300 mm front (over 284 mm); that accessory requires its own selected template.
+
+GTV INHC H04 hinges get Ø35 × 12 mm cups at K=3 mm (centre 20.5 mm from edge),
+45 mm cup screw spacing with a 9.5 mm offset, and 32 mm plate screw spacing at
+37 mm from the carcass front. Ø2.5 × 10 mm pilots are a project choice. Cup count
+is currently a project height-based rule, not a certified load calculation.
+Furniture fridge doors have independent cup hinges in addition to sliding
+couplers. `fridge.fronts.sliding_connectors` positions preview centres at
+`width_fraction_from_hinge: 0.75` and `height_fractions: [0.25, 0.75]`.
+The horizontal 90 × 38 mm markers mirror automatically for right hinges.
+These proportions are a user-selected illustration, not Samsung mounting data. Lift-up hinges attach to the top board; their -1 mm overlay adjustment
+retains the 3 mm top reveal. Unverified gas-lift holes have been removed; the
+selected lift's template and force remain to be specified.
+
+`handles.model` selects GTV UA-00-337160-20M from the existing handle library:
+160 mm fixing centres, 180 mm overall length, Ø5 through bores in this project.
+Drawer handles are exactly centred (a 160.5 mm high front has its centre at
+80.25 mm; do not independently round and lose centring). Door handles are vertical
+on the free edge: lower-front top corner, upper-front bottom corner. The flap
+handle is horizontal at its bottom edge. `door_edge_offset`, `door_end_offset`
+(nearest fixing hole) and `lift_bottom_offset` default to 50 mm. These are design
+choices, not mandatory manufacturer offsets. Preview handles follow the complete
+front motion, including rotation and picking.
+
+Generation always validates bore entry faces, depths and intersecting bore
+envelopes (`parts/machining.py`). A collision raises an error naming the part and
+both bores, with local coordinates; it never silently moves drilling. Resolve
+it in YAML. Validation is conservative near bore ends; it does not yet cover
+arbitrary groove intersections or full hardware/door swept-volume collisions.
+If a construction rule is missing, agree it with the user and implement it as a
+rule; do not patch generated parts or invent a manufacturer's drilling pattern.
+
+Missing machining templates are structured `DrawerModel.machining_issues`.
+Preview remains available and shows a status message with the missing operations.
+All manufacturing writers (CSV, drilling sheet and DXF) reject such a model before
+writing files; there is no override switch. The current kitchen is therefore
+**not yet exportable for production**: AXIS bottom-to-metal-side fixings, flap
+lifts, Samsung sliding couplers, and plinth-clip fixing still need
+verified mounting templates. Filling in those library templates must resolve the
+issues; removing an error flag without adding the missing machining is not a fix.
+
+Sources: [GTV AXIS PRO, pp.6–8](https://assets.gtv.com.pl/assets/attachments/karta_techniczna/Axis_Pro_karta%20techniczna_3.pdf),
+[GTV INHC H04](https://api2.gtv.com.pl/pimcore/assets/attachments/karta_techniczna/ZM-INHC_H04_07.12.2021.pdf),
+[GTV handle](https://gtv.com.pl/produkt/UA-00-337160-20M/),
+[handle placement principles](https://capramontandco.com/pages/capramont-co-cabinet-handle-size-placement-guide).
+
+`right_column.microwave.side_cutout` defines a rear-edge notch in the outer
+right side panel, behind the microwave. The current project marks a 280mm-high,
+120mm-deep notch, centred vertically in the microwave niche. Shallow Ø3 × 2mm
+pilot marks on the panel's inner face trace the three cut edges, up to four
+per edge, with the end marks 5mm from its corners. The existing rear panel edge
+needs no marks. The preview and DXF show the guide, but
+the cut-list panel remains rectangular; remove the marked material manually.
+Measure the outlet and cable route before cutting.
 
 For `desk_drawer_wall`, the desktop, left side and overhead shelves share the
 tower's rear plane; a deeper desktop extends towards the user. The left side
@@ -130,19 +267,21 @@ are detected from the adjoining back panels, including the common bridge.
 the lower back starts in the shelf above the drawers. Rebates follow the actual
 back outline in the viewer, machining sheet and DXF. Omitted `horizontal` defaults
 to false; omitted `behind_drawers` defaults to true for older projects.
-`front.bottom_overlay` and `front.top_overlay` override the vertical edge reveals:
-positive values cover the bottom panel from above and the top panel from below.
-The example uses 2 mm at the bottom and 3 mm at the top, so the fronts span Z=16 to Z=848 mm.
-For its five overlay fronts, 3 mm gaps give a width of
-`600 - 2*3 = 594 mm` and a total front height of `848 - 16 - 4*3 = 820 mm`.
-All five fronts are 164 mm high, preserving the 3 mm gaps. With `whole_mm: true`,
-computed shelf and
-support positions are rounded to millimetres, and keyboard hangers are extended
-to the next whole millimetre. Handle holes on an odd-height front move at most
-0.5 mm from the exact centre to have whole-millimetre vertical drilling coordinates.
-Purchased hardware dimensions and mounting clearances retain their database precision.
-The side overlay is `18 - 3 = 15 mm`. These are finished dimensions including edging;
-the visible 3 mm gap is independent of the 2 mm front-to-carcass distance.
+Overlay fronts share rules from `parts/front_rules.py`: 2 mm at each outside
+side, 3 mm at the bottom/top of the front group, 3 mm between stacked fronts,
+and 2 mm between paired doors. Overlays are derived from carcass thickness:
+16 mm at the sides and 15 mm at the ends for 18 mm board.
+The desk project now has five 596 × 169 mm fronts spanning Z=3 to Z=860 mm.
+The kitchen has 596 mm drawer fronts and two 297 mm upper doors.
+Appliance installation requirements take precedence at appliance boundaries.
+Front divisions use 0.5 mm increments, distributing any remainder without
+changing the total height or gaps. Handle holes remain centred.
+`front.mount: overlay` enables these rules for the standalone drawer and dresser;
+their existing inset examples retain their explicit recess and finger gaps.
+For a standalone drawer, `front.carcass_thickness` defaults to drawer board
+thickness and the niche dimensions describe the clear opening.
+The desk's legacy `whole_mm` option applies to other furniture positions, not
+overlay-front divisions or centred handle holes.
 
 ## Lighting controls (concept preview)
 
@@ -399,3 +538,12 @@ split of the remaining available height. Missing values are always treated as `f
 venv/bin/python -m pytest tests/ -v
 ```
 
+Samsung door geometry is stored in the model library from manual page 32: freezer
+Z=50–671 mm, refrigerator Z=735–1882 mm relative to the appliance base.
+The furniture-front gap is 3 mm centred at appliance Z=703 mm. In the kitchen
+project (appliance base at floor Z=118 mm), that gap is Z=819.5–822.5 mm.
+The fridge `fronts` section only specifies hinge side and panel thicknesses;
+width is derived from the carcass, and reveals/gaps use the common furniture
+rules in `parts/front_rules.py`, not per-appliance YAML settings.
+Drawer `front_heights: [300, 250, null]` automatically sizes the top drawer front
+to preserve alignment with the freezer furniture front (currently 160.5 mm).

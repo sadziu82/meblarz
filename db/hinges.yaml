@@ -1,0 +1,18 @@
+hinges:
+  GTV-ZM-INHC09H04-BE:
+    source: https://api2.gtv.com.pl/pimcore/assets/attachments/karta_techniczna/ZM-INHC_H04_07.12.2021.pdf
+    mounting: overlay
+    plate_height: 0
+    cup_diameter: 35
+    cup_depth: 12
+    cup_edge_distance: 3 # K=3 -> nominal overlay 16; adjustment +/-1.5.
+    nominal_overlay: 16
+    overlay_adjustment: 1.5
+    cup_screw_spacing: 45
+    cup_screw_offset: 9.5
+    plate_setback: 37
+    plate_screw_spacing: 32
+    front_thickness_range: [16, 18]
+    # Project wood-screw pilot choice, not a manufacturer hole diameter.
+    pilot_diameter: 2.5
+    pilot_depth: 10

@@ -22,6 +22,7 @@ handles:
     projection_mm: 26.5
     material: aluminium
     finish: black matt
+    preview_mesh: assets/handles/gtv_ua_337_160.obj
     hole_spacing: 160
     hole_diameter: 5        # project clearance bore
     hole_depth: through

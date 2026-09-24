@@ -10,6 +10,9 @@ import yaml
 
 from parts.drawer import Board, DrawerModel, Hole, JointHole, load_drawer
 from parts.desk_drawer_wall import load_desk_drawer_wall
+from parts.kitchen_tall_unit import load_kitchen_tall_unit
+from parts.kitchen_ventilation import (routable_guide_rectangles,
+                                       guide_marker_points)
 from parts.dresser import load_dresser
 
 
@@ -25,11 +28,25 @@ MEBLEPL_HEADER = [
 ]
 
 
+class IncompleteMachiningError(ValueError):
+    """Preview is available, but this model is not ready for manufacturing."""
+
+
+def _require_complete_machining(model: DrawerModel) -> None:
+    if model.machining_issues:
+        details = '\n'.join(f'- {issue["reason"]} Elementy: {", ".join(issue["boards"])}'
+                            for issue in model.machining_issues)
+        raise IncompleteMachiningError('Eksport produkcyjny zablokowany: niekompletna obróbka.\n'
+                                       + details + '\nPodgląd modelu pozostaje dostępny.')
+
+
 def _load_model(path: Path) -> DrawerModel:
     with path.open() as source:
         config = yaml.safe_load(source)
     if 'desk_drawer_wall' in config:
         return load_desk_drawer_wall(str(path))
+    if 'kitchen_tall_unit' in config:
+        return load_kitchen_tall_unit(str(path))
     return load_dresser(str(path)) if 'carcass' in config else load_drawer(str(path))
 
 
@@ -53,6 +70,7 @@ def _number(value: float) -> str:
 
 def write_meblepl_csv(model: DrawerModel, path: Path) -> None:
     """Write a semicolon-delimited CSV accepted by Meble.pl's PRO100 importer."""
+    _require_complete_machining(model)
     boards = [board for board in model.boards if not _is_slide_visualisation(board)]
     with path.open('w', encoding='utf-8', newline='') as output:
         writer = csv.writer(output, delimiter=';', lineterminator='\r\n')
@@ -98,7 +116,18 @@ def _drilling_rows(board: Board) -> list[tuple[str, str, str, str, str, str]]:
         rows.append((
             {'handle': 'uchwyt', 'wood_screw': 'wkręt dna',
              'wood_screw_pilot': 'pilotaż wkrętu dna',
-             'led_wire_entry': 'nawiert startowy przewodu LED'}.get(hole.kind, 'prowadnica'),
+             'led_wire_entry': 'nawiert startowy przewodu LED',
+             'hinge_cup': 'puszka zawiasu',
+             'hinge_screw': 'wkręt puszki zawiasu',
+             'hinge_plate': 'prowadnik zawiasu',
+             'axis_runner': 'AXIS PRO — mocowanie prowadnicy',
+             'axis_front': 'AXIS PRO — mocowanie frontu',
+             'axis_rear': 'AXIS PRO — mocowanie tyłu',
+             'column_tie_through': 'łączenie kolumn — otwór przelotowy',
+             'kitchen_leg_mount': 'mocowanie nóżki kuchennej',
+             'ventilation_cut_marker': 'znacznik ręcznego wycięcia wentylacji',
+             'manual_cutout_marker': 'znacznik ręcznego wycięcia za mikrofalą',
+             'gas_lift_mount': 'mocowanie podnośnika'}.get(hole.kind, 'prowadnica'),
             plane, _number(first), _number(second), hole.direction,
             f'Ø{_number(hole.diameter)}, ' + ('na wylot' if hole.through else f'głębokość {_number(hole.depth)} mm'),
         ))
@@ -113,6 +142,7 @@ def _drilling_rows(board: Board) -> list[tuple[str, str, str, str, str, str]]:
 
 def write_drilling_sheet(model: DrawerModel, path: Path, source_name: str) -> None:
     """Write one fabrication section per board, with local coordinates for each hole."""
+    _require_complete_machining(model)
     boards = [board for board in model.boards if not _is_slide_visualisation(board)]
     lines = [
         f'# Wiercenia — {source_name}',
@@ -170,6 +200,38 @@ def write_drilling_sheet(model: DrawerModel, path: Path, source_name: str) -> No
                     f"{_number(groove.get('x', 0)+groove.get('span_x', board.width))} mm.",
                     '',
                 ]
+            if groove['kind'] == 'ventilation_grille':
+                lines += [f"Wycięcie kratki wentylacyjnej: {_number(groove['width'])} × "
+                          f"{_number(groove['height'])} mm, lokalne X={_number(groove['x'])}, "
+                          f"Z={_number(groove['z'])} mm, przez całą grubość płyty.", '']
+            if groove['kind'] == 'ventilation_cut_guide':
+                second = 'Z' if groove['face'] == '-y' else 'Y'
+                value = groove['z'] if groove['face'] == '-y' else groove['y']
+                routed = routable_guide_rectangles(board, groove)
+                markers = guide_marker_points(board, groove)
+                lines += [f"Obrys otworu wentylacyjnego {_number(groove['width'])} × "
+                          f"{_number(groove['height'])} mm na płaszczyźnie {groove['face']}: "
+                          f"lokalne X={_number(groove['x'])}, {second}={_number(value)} mm; "
+                          f"{len(routed)} wręgi {_number(groove['groove_width'])} × "
+                          f"{_number(groove['depth'])} mm w zasięgu "
+                          f"{_number(groove['max_edge_offset'])} mm od krawędzi; "
+                          f"{len(markers)} znaczników Ø{_number(groove['marker_diameter'])} × "
+                          f"{_number(groove['marker_depth'])} mm na pozostałych odcinkach "
+                          f"(około {_number(groove['marker_spacing'])} mm, po "
+                          f"{_number(groove['marker_end_offset'])} mm od końców). "
+                          "Płyta pozostaje pełna; materiał wewnątrz obrysu wyciąć osobno po rozkroju.", '']
+            if groove['kind'] == 'manual_cutout_guide':
+                lines += [f"Obrys ręcznego wycięcia za mikrofalą: "
+                          f"{_number(groove['span_z'])} mm wysokości × "
+                          f"{_number(groove['span_y'])} mm wzdłuż głębokości boku, "
+                          f"od wewnętrznej strony {groove['face']}, lokalne Y={_number(groove['y'])}, "
+                          f"Z={_number(groove['z'])} mm. Nawierty Ø{_number(groove['marker_diameter'])} "
+                          f"× {_number(groove['marker_depth'])} mm, po maksymalnie "
+                          f"{groove['marker_count_per_edge']} na odcinek, pierwszy i ostatni "
+                          f"{_number(groove['marker_end_offset'])} mm od jego końców. "
+                          + ("Bez nawiertów na tylnej krawędzi płyty. "
+                             if not groove['rear_edge_marked'] else "") +
+                          "Formatka pozostaje pełna; materiał wewnątrz obrysu wyciąć ręcznie.", '']
         rows = _drilling_rows(board)
         if not rows:
             lines += ['Brak wierceń.', '']
@@ -225,6 +287,22 @@ def _dxf_drills(hole: Hole | JointHole) -> list[tuple[float, str]]:
         prefix = 'HANDLE' if hole.kind == 'handle' else 'DRILL'
         if hole.kind == 'led_wire_entry':
             prefix = 'LED_WIRE_START'
+        elif hole.kind == 'hinge_cup':
+            prefix = 'HINGE_CUP'
+        elif hole.kind == 'hinge_plate':
+            prefix = 'HINGE_PLATE'
+        elif hole.kind in ('hinge_screw', 'axis_runner', 'axis_front', 'axis_rear'):
+            prefix = hole.kind.upper()
+        elif hole.kind == 'gas_lift_mount':
+            prefix = 'GAS_LIFT_MOUNT'
+        elif hole.kind == 'column_tie_through':
+            prefix = hole.kind.upper()
+        elif hole.kind == 'kitchen_leg_mount':
+            prefix = 'KITCHEN_LEG_MOUNT'
+        elif hole.kind == 'ventilation_cut_marker':
+            prefix = 'VENT_CUT_MARKER'
+        elif hole.kind == 'manual_cutout_marker':
+            prefix = 'MANUAL_CUT_MARKER'
         depth = 'THRU' if hole.through else f'DEPTH{_number(hole.depth)}'
         return [(hole.diameter, f'{prefix}_D{_number(hole.diameter)}_{depth}')]
     if hole.hole_type == 'dowel':
@@ -271,6 +349,39 @@ def _dxf_file(board: Board, direction: str, holes: list[Hole | JointHole], groov
             drill_labels.append(layer.replace('_', ' '))
 
     for groove in grooves:
+        if groove.get('kind') == 'manual_cutout_guide' and direction == groove['face']:
+            layer = 'MANUAL_CUT_GUIDE_NOT_TOOLPATH'
+            layers.add(layer)
+            y1, z1 = groove['y'], groove['z']
+            y2, z2 = y1 + groove['span_y'], z1 + groove['span_z']
+            entities += _dxf_line(layer, y1, z1, y2, z1)
+            entities += _dxf_line(layer, y2, z1, y2, z2)
+            entities += _dxf_line(layer, y2, z2, y1, z2)
+            entities += _dxf_line(layer, y1, z2, y1, z1)
+            drill_labels.append('MANUAL CUT AFTER DELIVERY')
+            continue
+        if groove.get('kind') == 'ventilation_cut_guide' and direction == groove['face']:
+            layer = (f"GROOVE_VENT_GUIDE_W{_number(float(groove['groove_width']))}"
+                     f"_D{_number(float(groove['depth']))}")
+            layers.add(layer)
+            for x1, y1, x2, y2 in routable_guide_rectangles(board, groove):
+                entities += _dxf_line(layer, x1, y1, x2, y1)
+                entities += _dxf_line(layer, x2, y1, x2, y2)
+                entities += _dxf_line(layer, x2, y2, x1, y2)
+                entities += _dxf_line(layer, x1, y2, x1, y1)
+            drill_labels.append(layer.replace('_', ' '))
+            continue
+        if groove.get('kind') == 'ventilation_grille' and direction == '-y':
+            x1, z1 = float(groove['x']), float(groove['z'])
+            x2, z2 = x1 + float(groove['span_x']), z1 + float(groove['span_z'])
+            layer = f"CUTOUT_VENT_W{_number(float(groove['width']))}_H{_number(float(groove['height']))}"
+            layers.add(layer)
+            entities += _dxf_line(layer, x1, z1, x2, z1)
+            entities += _dxf_line(layer, x2, z1, x2, z2)
+            entities += _dxf_line(layer, x2, z2, x1, z2)
+            entities += _dxf_line(layer, x1, z2, x1, z1)
+            drill_labels.append(layer.replace('_', ' '))
+            continue
         if groove.get('kind') in ('back_rabbet', 'drawer_bottom') and direction == '+y':
             width = float(groove['width'])
             x1, z1 = groove['x'], groove['z']
@@ -323,6 +434,7 @@ def _dxf_file(board: Board, direction: str, holes: list[Hole | JointHole], groov
 
 def write_dxf_files(model: DrawerModel, output_dir: Path) -> list[Path]:
     """Write a DXF for every board face that contains drillings."""
+    _require_complete_machining(model)
     paths = []
     boards = [board for board in model.boards if not _is_slide_visualisation(board)]
     for index, board in enumerate(boards, start=1):
@@ -347,6 +459,7 @@ def write_dxf_files(model: DrawerModel, output_dir: Path) -> list[Path]:
 
 def export(path: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     model = _load_model(path)
+    _require_complete_machining(model)
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = path.stem
     csv_path = output_dir / f'{stem}-meblepl.csv'
@@ -365,7 +478,10 @@ def main() -> None:
     parser.add_argument('--output-dir', type=Path, default=Path('exports'),
                         help='directory for generated files (default: exports)')
     args = parser.parse_args()
-    csv_path, drilling_path, dxf_dir = export(args.yaml_path, args.output_dir)
+    try:
+        csv_path, drilling_path, dxf_dir = export(args.yaml_path, args.output_dir)
+    except ValueError as exc:
+        parser.exit(2, str(exc) + '\n')
     print(f'CSV do importu Meble.pl: {csv_path}')
     print(f'Dokumentacja wierceń: {drilling_path}')
     print(f'Pliki DXF wierceń: {dxf_dir}')

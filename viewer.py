@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QEvent, QSocketNotifier, Qt, QTimer
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtGui import QFont, QKeyEvent, QKeySequence, QShortcut, QSurfaceFormat
+from PyQt6.QtGui import QFont, QImage, QKeyEvent, QKeySequence, QShortcut, QSurfaceFormat
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -41,6 +41,9 @@ import yaml as _yaml
 from parts.drawer import DrawerModel, Board, Hole, JointHole, load_drawer
 from parts.dresser import load_dresser as load_komoda
 from parts.desk_drawer_wall import load_desk_drawer_wall
+from parts.kitchen_tall_unit import load_kitchen_tall_unit
+from parts.kitchen_ventilation import routable_guide_rectangles
+from parts.preview_mesh import board_mesh, ray_mesh
 
 
 def _load_config() -> dict:
@@ -102,6 +105,12 @@ _TERMINAL_CHAR_KEYS = {
     ord('A'): Qt.Key.Key_A,
     ord('d'): Qt.Key.Key_D,
     ord('D'): Qt.Key.Key_D,
+    ord('x'): Qt.Key.Key_X,
+    ord('X'): Qt.Key.Key_X,
+    ord('y'): Qt.Key.Key_Y,
+    ord('Y'): Qt.Key.Key_Y,
+    ord('z'): Qt.Key.Key_Z,
+    ord('Z'): Qt.Key.Key_Z,
     0x0F:     Qt.Key.Key_O,  # Ctrl+O
     0x11:     Qt.Key.Key_Q,  # Ctrl+Q
     0x12:     Qt.Key.Key_R,  # Ctrl+R
@@ -192,10 +201,18 @@ class TerminalInput:
 
 def _movable_group(board: Board) -> str:
     """Return the movable-group key (e.g. 'drawer_0') or 'default' for standalone drawers."""
+    if board.motion_parent:
+        match = re.match(r'^((?:tower|kitchen)_drawer_\d+)_', board.motion_parent)
+        return match.group(1) if match else board.motion_parent
+    if board.opening in ('lift_up', 'hinge_left', 'hinge_right'):
+        return board.name
+    m = re.match(r'^(fridge_(?:lower|upper)_door)_sliding_connector_', board.name)
+    if m:
+        return m.group(1)
     m = re.match(r'^(drawer_\d+)_', board.name)
     if m:
         return m.group(1)
-    m = re.match(r'^(tower_drawer_\d+)_', board.name)
+    m = re.match(r'^((?:tower|kitchen)_drawer_\d+)_', board.name)
     if m:
         return m.group(1)
     return 'keyboard_tray' if board.name.startswith('keyboard_tray') else 'default'
@@ -228,6 +245,20 @@ ANIM_DURATION  = _cfg('animation.duration',          1.0)
 ANIM_FPS       = _cfg('animation.fps',               60)
 ALPHA_INACTIVE = _cfg('transparency.inactive',       0.15)
 ALPHA_SELECTED = _cfg('transparency.selected',       0.50)
+
+# Visual limit for opening fronts. At 90° the narrow edge of a front stays in
+# the side-board outline instead of protruding past the cabinet exterior.
+HINGE_OPEN_ANGLE = 90.0
+# At 90° the entire 18 mm door thickness is coplanar with the 18 mm side board:
+# both its inner and outer faces coincide with the respective faces of the side.
+HINGE_SIDE_REVEAL = 2.0
+# At 90° the hinge-side edge would otherwise sit 16 mm behind the side front.
+# Move it 18 mm forward: 16 mm compensation plus a 2 mm visible clearance.
+HINGE_OPEN_FRONT_CLEARANCE = 18.0
+# Lift-up flap: with a 2 mm closed top reveal, its full thickness is aligned
+# between the inner and outer planes of the top panel at 90°.
+LIFT_OPEN_FRONT_CLEARANCE = 2.0
+LIFT_CLOSED_TOP_REVEAL = 2.0
 EYE_HEIGHT     = _cfg('initial_view.eye_height',     1500.0)   # mm
 
 
@@ -237,6 +268,7 @@ _SHORTCUTS = [
     ("View", [
         ("Home",               "reset view"),
         ("P",                  "toggle perspective / ortho"),
+        ("X / Y / Z",          "axis view; repeat for opposite side (keeps P mode)"),
         ("←→↑↓",              "pan"),
         ("Shift + ←→↑↓",      "rotate"),
         ("Ctrl + ↑ / ↓",      "zoom in / out"),
@@ -347,6 +379,9 @@ class GLWidget(QOpenGLWidget):
         self._proj_mat = None
         self._viewport = None
         self._perspective    = True
+        self._axis_centered = False
+        self._axis_view = None
+        self._texture_ids: dict[str, int] = {}
 
     # ── API ───────────────────────────────────────────────────────────────────
 
@@ -386,10 +421,28 @@ class GLWidget(QOpenGLWidget):
         self.update()
 
     def reset_view(self):
+        self._axis_centered = False
+        self._axis_view = None
         self.rot_x = _cfg('initial_view.rot_x', 0.0)
         self.rot_y = _cfg('initial_view.rot_y', -35.0)
         self.zoom  = _cfg('initial_view.zoom', 1.0)
         self.pan_x = 0.0; self.pan_z = 0.0
+        self.update()
+
+    def set_axis_view(self, axis: str):
+        """View an axis, alternating sides without changing projection mode."""
+        views = {
+            'x': ((0.0, -90.0), (0.0, 90.0)),  # right / left
+            'y': ((0.0, 0.0), (0.0, 180.0)),   # front / back
+            'z': ((90.0, 0.0), (-90.0, 0.0)),  # top / bottom
+        }
+        positive, negative = views[axis]
+        repeat = self._axis_view == axis and (self.rot_x, self.rot_y) == positive
+        self.rot_x, self.rot_y = negative if repeat else positive
+        self._axis_view = axis
+        self._axis_centered = True
+        self.pan_x = 0.0
+        self.pan_z = 0.0
         self.update()
 
     def load_model(self, model: DrawerModel):
@@ -449,11 +502,17 @@ class GLWidget(QOpenGLWidget):
         dist     = self._scene_size * 2.5 / self.zoom
         orbit_z  = self._model_center_z + self.pan_z   # camera orbits around furniture centre
         eye_z    = EYE_HEIGHT           + self.pan_z   # camera stays at eye level above floor
+        if self._axis_centered:
+            eye_z = orbit_z
         gluLookAt(self.pan_x, -dist, eye_z,
                   self.pan_x,     0, orbit_z,
                   0, 0, 1)
+        if self._axis_centered:
+            glTranslatef(0, 0, self._model_center_z)
         glRotatef(self.rot_x, 1, 0, 0)
         glRotatef(self.rot_y, 0, 0, 1)
+        if self._axis_centered:
+            glTranslatef(0, 0, -self._model_center_z)
         self._mv_mat   = glGetDoublev(GL_MODELVIEW_MATRIX)
         self._proj_mat = glGetDoublev(GL_PROJECTION_MATRIX)
         self._viewport = glGetIntegerv(GL_VIEWPORT)
@@ -469,20 +528,68 @@ class GLWidget(QOpenGLWidget):
         boards   = self.model.boards
         sel_name = boards[sel].name if sel is not None else None
         _bidx    = {id(b): i for i, b in enumerate(boards)}
+        by_name = {b.name: b for b in boards}
 
-        def _t(b):
+        def _apply_board_transform(b):
+            """Apply drawer translation or a door rotation around its real hinge axis."""
+            if b.motion_parent:
+                parent = by_name[b.motion_parent]
+                _apply_board_transform(parent)
+                glTranslatef(*(b.pos[i] - parent.pos[i] for i in range(3)))
+                glRotatef(b.yaw, 0, 0, 1)
+                return
+            glTranslatef(*b.pos)
             if not b.movable:
-                return 0.0
+                glRotatef(b.yaw, 0, 0, 1)
+                return
             key = self._board_group_keys[_bidx[id(b)]]
             travel = self.model.max_travel if b.travel is None else b.travel
-            return travel * self._open_per_group.get(key, 0.0) * b.move_fraction
+            amount = self._open_per_group.get(key, 0.0) * b.move_fraction
+            if b.opening == 'lift_up':
+                # Top flap: horizontal X axis along its upper rear edge.
+                glTranslatef(0, -LIFT_OPEN_FRONT_CLEARANCE * amount,
+                             -(b.depth - LIFT_CLOSED_TOP_REVEAL) * amount)
+                glTranslatef(0, b.depth, b.height)
+                glRotatef(-90 * amount, 1, 0, 0)
+                glTranslatef(0, -b.depth, -b.height)
+            elif b.opening == 'hinge_left':
+                pivot_x = b.depth - HINGE_SIDE_REVEAL
+                glTranslatef(0, -HINGE_OPEN_FRONT_CLEARANCE * amount, 0)
+                glTranslatef(pivot_x, b.depth, 0)
+                # Free edge swings towards the viewer (negative Y), outside
+                # the carcass, rather than into the cabinet.
+                glRotatef(-HINGE_OPEN_ANGLE * amount, 0, 0, 1)
+                glTranslatef(-pivot_x, -b.depth, 0)
+            elif b.opening == 'hinge_right':
+                pivot_x = b.width - (b.depth - HINGE_SIDE_REVEAL)
+                glTranslatef(0, -HINGE_OPEN_FRONT_CLEARANCE * amount, 0)
+                glTranslatef(pivot_x, b.depth, 0)
+                glRotatef(HINGE_OPEN_ANGLE * amount, 0, 0, 1)
+                glTranslatef(-pivot_x, -b.depth, 0)
+            else:
+                glTranslatef(0, -travel * amount, 0)
+            glRotatef(b.yaw, 0, 0, 1)
 
         def draw_body(b, alpha):
             r, g, bv, _ = b.color
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
-            glRotatef(b.yaw, 0, 0, 1)
+            _apply_board_transform(b)
+            if b.texture:
+                self._draw_textured_face(b, alpha)
+                glPopMatrix()
+                return
             glColor4f(r, g, bv, alpha)
+            if b.preview_mesh:
+                vertices, normals = board_mesh(b)
+                glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT)
+                glEnableClientState(GL_VERTEX_ARRAY)
+                glEnableClientState(GL_NORMAL_ARRAY)
+                glVertexPointer(3, GL_FLOAT, 0, vertices)
+                glNormalPointer(GL_FLOAT, 0, normals)
+                glDrawArrays(GL_TRIANGLES, 0, len(vertices))
+                glPopClientAttrib()
+                glPopMatrix()
+                return
             rabbets = [g for g in b.grooves if g['kind'] in ('back_rabbet', 'drawer_bottom')]
             if rabbets:
                 depth = rabbets[0]['depth']
@@ -500,6 +607,20 @@ class GLWidget(QOpenGLWidget):
                         glColor4f(r, g, bv, alpha)
                         self._draw_box(x2-x1, depth, z2-z1)
                         glPopMatrix()
+            elif b.preview_shape == 'cylinder_z':
+                glPushMatrix()
+                glTranslatef(b.width / 2, b.depth / 2, 0)
+                q = gluNewQuadric()
+                gluQuadricNormals(q, GLU_SMOOTH)
+                radius = b.width / 2
+                gluCylinder(q, radius, radius, b.height, 24, 1)
+                gluQuadricOrientation(q, GLU_INSIDE)
+                gluDisk(q, 0, radius, 24, 1)
+                glTranslatef(0, 0, b.height)
+                gluQuadricOrientation(q, GLU_OUTSIDE)
+                gluDisk(q, 0, radius, 24, 1)
+                gluDeleteQuadric(q)
+                glPopMatrix()
             elif b.corner_radius > 0 and any(b.rounded_front_corners):
                 self._draw_rounded_box(b.width, b.depth, b.height, b.corner_radius,
                                        b.rounded_front_corners)
@@ -509,7 +630,7 @@ class GLWidget(QOpenGLWidget):
 
         def draw_slide_holes(b):
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
+            _apply_board_transform(b)
             for h in b.holes:
                 glPushMatrix()
                 glTranslatef(h.x - b.pos[0], h.y - b.pos[1], h.z - b.pos[2])
@@ -523,13 +644,46 @@ class GLWidget(QOpenGLWidget):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             glDepthMask(GL_FALSE)
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1]-_t(b), b.pos[2])
-            glRotatef(b.yaw, 0, 0, 1)
+            _apply_board_transform(b)
             for groove in b.grooves:
-                depth = groove['depth']
+                depth = groove.get('depth', 0)
+                if groove['kind'] == 'manual_cutout_guide':
+                    y, z = groove['y'], groove['z']
+                    span_y, span_z = groove['span_y'], groove['span_z']
+                    frame = 1.0
+                    face_x = b.width - 0.2 if groove['face'] == '+x' else -0.3
+                    for pos, size in (
+                        ((face_x, y, z), (0.5, span_y, frame)),
+                        ((face_x, y, z + span_z - frame), (0.5, span_y, frame)),
+                        ((face_x, y, z), (0.5, frame, span_z)),
+                        ((face_x, y + span_y - frame, z), (0.5, frame, span_z)),
+                    ):
+                        glPushMatrix()
+                        glTranslatef(*pos)
+                        glColor4f(1, 0.05, 0.05, 0.65)
+                        self._draw_box(*size)
+                        glPopMatrix()
+                    continue
+                if groove['kind'] == 'ventilation_cut_guide':
+                    for x1, y1, x2, y2 in routable_guide_rectangles(b, groove):
+                        if groove['face'] == '-y':
+                            pos = (x1, -0.3, y1)
+                            size = (x2-x1, depth+0.3, y2-y1)
+                        else:
+                            pos = (x1, y1, b.height-depth)
+                            size = (x2-x1, y2-y1, depth+0.3)
+                        glPushMatrix()
+                        glTranslatef(*pos)
+                        glColor4f(1, 0.05, 0.05, 0.65)
+                        self._draw_box(*size)
+                        glPopMatrix()
+                    continue
                 if groove['kind'] in ('back_rabbet', 'drawer_bottom'):
                     pos = (groove['x'], b.depth-depth, groove['z'])
                     size = (groove['span_x'], depth+0.3, groove['span_z'])
+                elif groove['kind'] == 'ventilation_grille':
+                    pos = (groove['x'], -0.3, groove['z'])
+                    size = (groove['span_x'], depth + 0.6, groove['span_z'])
                 elif groove['kind'] == 'led_wire':
                     pos = (groove['x'], groove['y'], b.height-depth if groove['face'] == '+z' else -0.3)
                     size = (groove['span_x'], groove['span_y'], depth+0.3)
@@ -550,7 +704,7 @@ class GLWidget(QOpenGLWidget):
 
         def draw_joint_holes(b, filter_partner=None):
             glPushMatrix()
-            glTranslatef(b.pos[0], b.pos[1] - _t(b), b.pos[2])
+            _apply_board_transform(b)
             for jh in b.joint_holes:
                 if filter_partner is not None and jh.partner != filter_partner:
                     continue
@@ -587,6 +741,42 @@ class GLWidget(QOpenGLWidget):
         for b in boards:
             draw_grooves(b)
         self._draw_grid()
+
+    def _draw_textured_face(self, board, alpha):
+        """Draw a project image on the front face of a preview board."""
+        texture_id = self._texture_ids.get(board.texture)
+        if texture_id is None:
+            path = Path(board.texture)
+            if not path.is_absolute():
+                path = Path(__file__).parent / path
+            image = QImage(str(path)).convertToFormat(QImage.Format.Format_RGBA8888)
+            if image.isNull():
+                return
+            texture_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, texture_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width(), image.height(), 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE,
+                         image.constBits().asstring(image.sizeInBytes()))
+            self._texture_ids[board.texture] = texture_id
+        glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT)
+        glDisable(GL_LIGHTING)
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glColor4f(1, 1, 1, alpha)
+        glBegin(GL_QUADS)
+        glTexCoord2f(0, 1); glVertex3f(0, 0, 0)
+        glTexCoord2f(1, 1); glVertex3f(board.width, 0, 0)
+        glTexCoord2f(1, 0); glVertex3f(board.width, 0, board.height)
+        glTexCoord2f(0, 0); glVertex3f(0, 0, board.height)
+        glEnd()
+        glPopAttrib()
 
     def _draw_box(self, w, d, h):
         v = [(0,0,0),(w,0,0),(w,d,0),(0,d,0),(0,0,h),(w,0,h),(w,d,h),(0,d,h)]
@@ -830,20 +1020,60 @@ class GLWidget(QOpenGLWidget):
             return None
         rd /= n
         best_t, best_i = np.inf, None
-        for i, b in enumerate(self.model.boards):
+        by_name = {b.name: b for b in self.model.boards}
+        for i, target in enumerate(self.model.boards):
+            b = by_name[target.motion_parent] if target.motion_parent else target
+            # Rendered transform is: position → opening motion → yaw.  Transform
+            # the ray by its inverse so picking follows a rotated door, not its
+            # closed-position bounding box.
+            point = ro - np.array(b.pos, dtype=float)
+            direction = rd.copy()
+            yaw = math.radians(b.yaw)
+            if yaw:
+                c, s = math.cos(yaw), math.sin(yaw)
+                inverse_yaw = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+                point, direction = inverse_yaw @ point, inverse_yaw @ direction
             if b.movable:
                 key  = self._board_group_keys[i]
                 travel = self.model.max_travel if b.travel is None else b.travel
-                trvl = travel * self._open_per_group.get(key, 0.0) * b.move_fraction
-            else:
-                trvl = 0.0
-            bmin = np.array([b.pos[0],        b.pos[1]-trvl,         b.pos[2]])
-            bmax = np.array([b.pos[0]+b.width, b.pos[1]-trvl+b.depth, b.pos[2]+b.height])
-            angle = math.radians(b.yaw)
-            c, s = math.cos(angle), math.sin(angle)
-            inverse = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-            t = _ray_aabb(inverse @ (ro-bmin), inverse @ rd,
-                          np.zeros(3), np.array([b.width, b.depth, b.height]))
+                amount = self._open_per_group.get(key, 0.0) * b.move_fraction
+                if b.opening == 'lift_up':
+                    pivot = np.array([0.0, b.depth, b.height])
+                    point[1] += LIFT_OPEN_FRONT_CLEARANCE * amount
+                    point[2] += (b.depth - LIFT_CLOSED_TOP_REVEAL) * amount
+                    angle = math.radians(90 * amount)  # inverse of -90° render rotation
+                    c, s = math.cos(angle), math.sin(angle)
+                    inverse_motion = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+                    point = pivot + inverse_motion @ (point - pivot)
+                    direction = inverse_motion @ direction
+                elif b.opening in ('hinge_left', 'hinge_right'):
+                    pivot = np.array([
+                        b.depth - HINGE_SIDE_REVEAL if b.opening == 'hinge_left'
+                        else b.width - (b.depth - HINGE_SIDE_REVEAL),
+                        b.depth, 0.0,
+                    ])
+                    point[1] += HINGE_OPEN_FRONT_CLEARANCE * amount
+                    # Inverse of the sign used by _apply_board_transform.
+                    sign = 1 if b.opening == 'hinge_left' else -1
+                    open_angle = math.radians(HINGE_OPEN_ANGLE * amount)
+                    angle = sign * open_angle
+                    c, s = math.cos(angle), math.sin(angle)
+                    inverse_motion = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+                    point = pivot + inverse_motion @ (point - pivot)
+                    direction = inverse_motion @ direction
+                else:
+                    point[1] += travel * amount
+            if target.motion_parent:
+                point -= np.array(target.pos) - np.array(b.pos)
+                if target.yaw:
+                    angle = math.radians(target.yaw)
+                    c, s = math.cos(angle), math.sin(angle)
+                    inverse = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+                    point, direction = inverse @ point, inverse @ direction
+            t = _ray_aabb(point, direction,
+                          np.zeros(3), np.array([target.width, target.depth, target.height]))
+            if t is not None and target.preview_mesh:
+                t = ray_mesh(point, direction, board_mesh(target)[0])
             if t is not None and t < best_t:
                 best_t, best_i = t, i
         return best_i
@@ -958,6 +1188,11 @@ class MainWindow(QMainWindow):
         if k == Key.Key_Home:
             self.gl.reset_view(); return
 
+        # Axis views preserve the projection selected with P.
+        if k in (Key.Key_X, Key.Key_Y, Key.Key_Z):
+            self.gl.set_axis_view({Key.Key_X: 'x', Key.Key_Y: 'y', Key.Key_Z: 'z'}[k])
+            return
+
         # Drawers: + / - (all groups simultaneously)
         if k in (Key.Key_Plus, Key.Key_Equal):
             self._adjust_all(+5); return
@@ -1050,6 +1285,8 @@ class MainWindow(QMainWindow):
                 keys = _yaml.safe_load(f).keys()
             if 'desk_drawer_wall' in keys:
                 model = load_desk_drawer_wall(path)
+            elif 'kitchen_tall_unit' in keys:
+                model = load_kitchen_tall_unit(path)
             elif 'carcass' in keys:
                 model = load_komoda(path)
             else:
@@ -1058,6 +1295,15 @@ class MainWindow(QMainWindow):
             self._group_open = {}
             self.gl.load_model(model)
             self.setWindowTitle(f"Meblarz — {Path(path).name}")
+            if model.machining_issues:
+                self.statusBar().showMessage(
+                    f'Podgląd dostępny. Eksport zablokowany — braki obróbki: {len(model.machining_issues)} (szczegóły po najechaniu).')
+                self.statusBar().setToolTip('\n'.join(
+                    f'{issue["reason"]} Elementy: {", ".join(issue["boards"])}'
+                    for issue in model.machining_issues))
+            else:
+                self.statusBar().clearMessage()
+                self.statusBar().setToolTip('')
         except Exception as exc:
             QMessageBox.critical(self, "Load error", str(exc))
 

@@ -1,0 +1,120 @@
+# Two-column kitchen tall unit. All dimensions are millimetres.
+kitchen_tall_unit:
+  height: 2420
+  depth: 610 # Głębokość korpusu obu kolumn [mm], bez wystających frontów i uchwytów.
+  panels:
+    top: shared    # shared: jedna płyta; separate: osobna dla każdej kolumny.
+    bottom: shared # Niezależne ustawienie dla dna.
+  plinth:
+    height: 100
+    inset_front: 10 # Przednia płyta cokołu 10 mm za licem korpusu; tył bez zmian.
+  legs: # Regulowane nogi: po 4 na kolumnę, wysokość = plinth.height.
+    enabled: true
+    model: EMUCA-BONE-2024417 # Zestaw z płytką i klipsami cokołowymi.
+    side_offset: 65 # Od krawędzi korpusu do osi nogi [mm].
+    front_offset: 80
+    rear_offset: 65
+  fridge_ventilation:
+    enabled: true
+    guide: # Obrys do ręcznego wycięcia; wręg tylko do 50 mm od krawędzi.
+      width: 3.2
+      depth: 2
+      max_edge_offset: 50
+      marker_diameter: 3
+      marker_depth: 2 # Płytki znacznik, nie otwór przelotowy.
+      marker_spacing: 20
+      marker_end_offset: 5 # Pierwszy/ostatni nawiert 5 mm od końców odcinka.
+    openings: # Szerokość × głębokość/wysokość, mm; 500 × 40 = 200 cm².
+      plinth: {width: 500, height: 40, bottom_offset: 30}
+      bottom: {width: 500, depth: 40}
+      middle: {width: 500, depth: 40}
+      top: {width: 500, depth: 40}
+    upper_back:
+      enabled: true
+      clearance: 10 # Odstęp pleców od przedniej krawędzi otworu wentylacyjnego.
+      # Płyta meblowa; grubość domyślnie z material.thickness.
+
+  material:
+    thickness: 18
+
+  joinery: # Wyliczane automatycznie ze styków płyt korpusu.
+    hidden: confirmat
+    visible: dowel
+    end_panels: confirmat # Łby od góry wieńca / od spodu dna.
+    edge_distance: 50
+    max_spacing: 300
+    dowel_between_confirmats_above: 200 # Kołek pośrodku odstępu > 200 mm.
+    column_ties: # Nawierty przez stykające się boki obu kolumn, przed montażem lodówki.
+      enabled: true
+      diameter: 3
+      first_above_bottom: 100 # Od górnej powierzchni dolnej płyty.
+      last_below_top: 100    # Od dolnej powierzchni górnej płyty.
+      min_spacing: 500
+      max_spacing: 800
+      front_offset: 100
+      rear_offset: 100
+
+  hinges:
+    model: GTV-ZM-INHC09H04-BE
+
+  handles:
+    model: GTV-UA-337-160-BLACK # UA-00-337160-20M, rozstaw 160 mm.
+    hole_diameter: 5 # Otwór przelotowy z luzem dla śruby; wybór projektowy.
+    door_edge_offset: 50 # Oś od krawędzi przeciwnej do zawiasów.
+    door_end_offset: 50 # Najbliższy otwór od dołu drzwi górnych / góry zamrażarki.
+    lift_bottom_offset: 50 # Poziomy uchwyt klapy, oś od dolnej krawędzi.
+
+  left_column:
+    # Samsung recommends 714 mm clear width (allowed 712–720 mm).
+    clear_width: 714
+    fridge:
+      model: SAMSUNG-BRB38G705DWWEF
+      # Two ordinary overlay fronts, coupled to appliance doors with sliding
+      # plastic connectors from Samsung's installation kit.
+      fronts:
+        hinge_side: left
+        sliding_connectors: # Środki znaczników podglądu, nie szablon wierceń Samsung.
+          width_fraction_from_hinge: 0.75
+          height_fractions: [0.25, 0.75]
+        # Width follows the carcass and common front rules (parts/front_rules.py).
+        # The common vertical gap is centred in the appliance door separation.
+        # Both fronts use 18 mm board; freezer-side panel mass must stay ≤15.5 kg.
+        lower_thickness: 18
+        upper_thickness: 18
+
+  right_column:
+    # External width of its own carcass; its left side touches the left carcass.
+    width: 600
+    drawers:
+      # From bottom: large, medium, small. These are overlay front heights.
+      # null: the upper front fills the remaining height up to the freezer front.
+      # Current heights: 300 + 3 + 250 + 3 + 160.5 = 716.5 mm.
+      front_heights: [300, 250, null]
+      gap: 3
+      rail_depth: 100 # Fixed separators behind the gaps between drawer fronts [mm].
+      rail_thickness: 18
+      axis_pro:
+        model: GTV-AXIS-PRO
+        nl: 600
+        # Od dołu: PB-AXISPRO-KPL600D/B/A. Boki metalowe: 200/120/86 mm;
+        # tyły z płyty: 199/116/84 mm. Są to różne wymiary.
+        variants: [D, B, A]
+        bottom_thickness: 16
+
+    oven:
+      model: ELECTROLUX-EOE7C31Z
+
+    microwave:
+      model: ELECTROLUX-EMS4253TMK
+      side_cutout: # Obrys ręcznego wycięcia w zewnętrznym prawym boku, od środka.
+        enabled: true
+        depth: 120  # Wzdłuż głębokości szafki, od tylnej krawędzi.
+        height: 280 # W pionie; środek na połowie wysokości wnęki.
+        rear_offset: 0
+        marker_diameter: 3
+        marker_depth: 2
+        marker_count_per_edge: 4 # Maksymalnie 4 na odcinek; bez nawiertów na tylnym brzegu płyty.
+        marker_end_offset: 5
+
+    upper_cabinet:
+      shelves: 1 # Full-width shelves; two doors, no vertical partition.

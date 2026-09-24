@@ -154,8 +154,6 @@ desk_drawer_wall:
         mount: overlay      # front covers carcass edges
         carcass_gap: 2
         gap: 3
-        bottom_overlay: 2   # front starts 16 mm above floor; all five fronts are 164 mm high
-        top_overlay: 3      # overlap onto the shelf above the drawers
         handle:
           model: GOODHOME-ATOMIA-293-BLACK
           hole_diameter: 3  # user's assumption for these handles

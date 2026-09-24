@@ -7,6 +7,7 @@ Output: DrawerModel with all boards (carcass + drawers).
 from pathlib import Path
 from typing import List, Tuple
 import yaml
+from parts.front_rules import SIDE_REVEAL, END_REVEAL, VERTICAL_GAP, split_front_heights
 
 from parts.drawer import (
     Board, Hole, JointHole, DrawerModel,
@@ -116,6 +117,11 @@ def _rename_drawer(boards: list[Board],
             grooves=list(b.grooves),
             fabrication=b.fabrication,
             yaw=b.yaw,
+            opening=b.opening,
+            label=b.label,
+            texture=b.texture,
+            preview_shape=b.preview_shape,
+            preview_mesh=b.preview_mesh,
         ))
     renamed_joints = [(name_map[a], name_map[b]) for a, b in joints]
     return renamed, renamed_joints
@@ -170,6 +176,13 @@ def load_dresser(path: str) -> DrawerModel:
     side_gap = cfg['front']['side_gap']
     bot_gap  = cfg['front']['bottom_gap']
     top_gap  = cfg['front']['top_gap']
+    overlay = cfg['front'].get('mount', 'inset') == 'overlay'
+    if overlay:
+        inset = -(d_thick + float(cfg['front'].get('carcass_gap', 2)))
+        side_gap = SIDE_REVEAL - thick
+        bot_gap = top_gap = 0
+        if height_mode != 'front':
+            raise ValueError('Overlay drawers require height_mode: front')
 
     # ── Interior dimensions ───────────────────────────────────────────────────
     interior_W = carcass_w - 2 * thick
@@ -178,6 +191,8 @@ def load_dresser(path: str) -> DrawerModel:
 
     # ── Front heights ─────────────────────────────────────────────────────────
     available_for_fronts = interior_H - (n_drawers - 1) * r_thick - n_drawers * (bot_gap + top_gap)
+    if overlay:
+        available_for_fronts = carcass_h - plinth_h - 2 * END_REVEAL - (n_drawers - 1) * VERTICAL_GAP
 
     if distrib == 'custom':
         given_raw = list(cfg['drawers']['heights'])
@@ -208,12 +223,24 @@ def load_dresser(path: str) -> DrawerModel:
         front_heights = [base_H] * n_drawers
         front_heights[0] += remainder   # excess goes to the lowest drawer
 
+    if overlay:
+        given = list(cfg['drawers'].get('heights', [])) if distrib == 'custom' else []
+        remaining = n_drawers - len(given)
+        if remaining:
+            front_heights = given + split_front_heights(available_for_fronts - sum(given), remaining)
+        elif abs(sum(given) - available_for_fronts) > 1e-6:
+            raise ValueError('Overlay front heights must fill the carcass with 3 mm reveals')
+        if any(value <= 0 for value in front_heights):
+            raise ValueError('Drawer front heights must be positive')
+
     # ── Z positions (from plinth bottom) ─────────────────────────────────────
     z_plinth_top = plinth_h
     z_int_bottom = plinth_h + thick
 
     def niche_z(i: int) -> float:
         """Z position of the niche for drawer i (0 = bottom-most)."""
+        if overlay:
+            return plinth_h + END_REVEAL + sum(front_heights[:i]) + i * VERTICAL_GAP
         z = z_int_bottom
         for j in range(i):
             z += bot_gap + front_heights[j] + top_gap + r_thick
@@ -221,6 +248,9 @@ def load_dresser(path: str) -> DrawerModel:
 
     rail_z = [niche_z(i) + bot_gap + front_heights[i] + top_gap
               for i in range(n_drawers - 1)]
+    if overlay:
+        rail_z = [niche_z(i) + front_heights[i] + (VERTICAL_GAP - r_thick) / 2
+                  for i in range(n_drawers - 1)]
 
     # ── Joint types ───────────────────────────────────────────────────────────
     # Visible sides → dowels; hidden sides → confirmats (rules 49-51)
@@ -424,6 +454,7 @@ def load_dresser(path: str) -> DrawerModel:
             bot_gap=bot_gap,
             target_nl=target_nl,
             handle=cfg['front'].get('handle'),
+            box_bottom_offset=thick + 2 if overlay else 2,
         )
         nl_used = nl
 

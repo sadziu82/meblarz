@@ -11,6 +11,7 @@ from parts.dresser import _rename_drawer
 from parts.drawer import _require_side_slide, _resolve_handle
 from parts.monitor_setup import append_monitor_setup
 from parts.lighting_controls import append_lighting_controls
+from parts.front_rules import SIDE_REVEAL, END_REVEAL, VERTICAL_GAP, split_front_heights
 
 
 _C_MAIN = (0.82, 0.67, 0.47, 1.0)
@@ -469,19 +470,16 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
     overlay = front.get('mount', 'inset') == 'overlay'
     gap = float(front.get('gap', 3))
     if overlay:
-        bottom_overlay = float(front.get('bottom_overlay', thick - gap))
-        top_overlay = float(front.get('top_overlay', -gap))
+        gap = VERTICAL_GAP
+        bottom_overlay = thick - END_REVEAL
+        top_overlay = thick - END_REVEAL
         front_bottom = thick - bottom_overlay
         front_top = section_h + top_overlay
         if not 0 <= bottom_overlay <= thick or not -thick <= top_overlay <= thick:
             raise ValueError('Front overlays must fit the bottom and top panel thickness')
         if drawer_count < 1 or gap < 0 or front_top - front_bottom <= gap * (drawer_count - 1):
             raise ValueError('Drawer fronts and gaps must fit the drawer section')
-        front_heights = [(front_top - front_bottom - gap * (drawer_count - 1)) / drawer_count] * drawer_count
-        if whole_mm:
-            available = round(front_top - front_bottom - gap * (drawer_count - 1))
-            base, remainder = divmod(available, drawer_count)
-            front_heights = [base + (index < remainder) for index in range(drawer_count)]
+        front_heights = split_front_heights(front_top - front_bottom - gap * (drawer_count - 1), drawer_count)
     else:
         available_h = section_h - thick - (drawer_count - 1) * rail_thick - drawer_count * (
             float(front['top_gap']) + float(front['bottom_gap']))
@@ -507,13 +505,13 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
             board_thickness=float(material.get('drawer_thickness', thick)),
             bot=bottom_thickness, slide_cfg=slide_cfg,
             inset=-(float(material.get('drawer_thickness', thick)) + float(front.get('carcass_gap', 2))) if overlay else float(front['inset']),
-            side_gap=gap - thick if overlay else float(front['side_gap']),
+            side_gap=SIDE_REVEAL - thick if overlay else float(front['side_gap']),
             bot_gap=0 if overlay else float(front['bottom_gap']), target_nl=drawers['slides'].get('nl'),
             handle=front.get('handle'),
             box_bottom_offset=thick + 2 if overlay else 2,
         )
         nl_used = nl
-        if whole_mm:
+        if whole_mm and not overlay:
             for board in drawer_boards:
                 for hole in board.holes:
                     if hole.kind == 'handle':
@@ -717,6 +715,12 @@ def _append_handle_preview(boards, config):
     center_x = sum(h.x for h in holes)/2
     center_z = sum(h.z for h in holes)/2
     color = (0.08, 0.08, 0.08, 1) if 'black' in handle.get('finish', '') else (0.65, 0.65, 0.67, 1)
+    if handle.get('preview_mesh'):
+        boards.append(Board('handle_bar', length, height, projection,
+                            (center_x-length/2, front.pos[1]-projection, center_z-height/2),
+                            color, movable=True, fabrication=False,
+                            preview_mesh=handle['preview_mesh']))
+        return
     boards.append(Board('handle_bar', length, height, metal,
                         (center_x-length/2, front.pos[1]-projection, center_z-height/2),
                         color, movable=True, fabrication=False))

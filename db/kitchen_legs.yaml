@@ -1,0 +1,19 @@
+legs:
+  EMUCA-BONE-2024417:
+    source: https://resources.emuca.com/hubfs/CATALOGO%20TECNICO%202025/FRANCES-ALEMAN/BAES_EMUCA_2025-FR-DE.pdf
+    page: 727
+    kit: 2024417
+    height_range: [98, 140]
+    load_per_leg_kg: 40
+    certified_module_load_kg: 100
+    plate_width: 78
+    plate_depth: 83
+    plate_height: 25
+    mounting_spacing_x: 64
+    mounting_spacing_y: 64
+    foot_diameter: 48
+    stem_diameter: 30
+    # The catalogue dimensions the fixing centres; pilot sizing is our choice
+    # for Ø4 wood screws in 18 mm board, not a manufacturer-specified bore.
+    pilot_diameter: 2.5
+    pilot_depth: 12

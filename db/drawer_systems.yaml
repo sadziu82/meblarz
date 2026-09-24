@@ -1,0 +1,37 @@
+systems:
+  GTV-AXIS-PRO:
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/Axis_Pro_karta%20techniczna_3.pdf
+    pages: [6, 7, 8]
+    mounting: metal_sides
+    bottom_thickness: 16
+    rear_thickness: 16
+    bottom_width_deduction: 75
+    rear_width_deduction: 87
+    bottom_length_deduction: 24
+    side_length_deduction: 7
+    side_thickness: 14
+    minimum_depth_extra: 10
+    # Heights of purchased sides and cut rear boards are NOT interchangeable.
+    variants:
+      A: {side_height: 86, rear_height: 84, minimum_niche_height: 115, front_holes: [32.5, 64.5], rear_holes_from_top: [19, 51]}
+      B: {side_height: 120, rear_height: 116, minimum_niche_height: 147, front_holes: [32.5, 64.5], rear_holes_from_top: [19, 51, 83]}
+      C: {side_height: 168, rear_height: 167, minimum_niche_height: 198, front_holes: [32.5, 64.5, 128.5, 160.5], rear_holes_from_top: [19, 83, 147]}
+      D: {side_height: 200, rear_height: 199, minimum_niche_height: 230, front_holes: [32.5, 64.5, 128.5, 160.5], rear_holes_from_top: [19, 83, 147]}
+    # Selected circular holes in the upper row; origin = carcass front edge.
+    runner_holes:
+      250: [37, 133]
+      300: [37, 165]
+      350: [37, 165]
+      400: [37, 229]
+      450: [37, 229]
+      500: [37, 261]
+      550: [37, 261]
+      600: [37, 261, 389]
+    runner_hole_height: 32
+    front_hole_inset: 15.5
+    rear_hole_inset: 9.5
+    connector_pilot_diameter: 2
+    connector_pilot_depth: 12
+    # Pilot for selected wood screws: project choice, not steel-slot diameter.
+    runner_pilot_diameter: 3
+    runner_pilot_depth: 12

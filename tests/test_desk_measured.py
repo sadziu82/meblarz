@@ -32,10 +32,10 @@ def test_overlay_fronts_cover_sides_and_do_not_enter_carcass(boards):
     side = boards['tower_left_side']
     fronts = [boards[f'tower_drawer_{i}_front'] for i in range(4)]
     assert fronts[0].pos[2] == 3
-    assert fronts[-1].pos[2] + fronts[-1].height == boards['desk_top'].pos[2] - 3
+    assert fronts[-1].pos[2] + fronts[-1].height == boards['desk_top'].pos[2] + 18 - 3
     for front in fronts:
-        assert front.width == 594
-        assert front.pos[0] == pytest.approx(side.pos[0] + 3)
+        assert front.width == 596
+        assert front.pos[0] == pytest.approx(side.pos[0] + 2)
         assert front.pos[1] + front.depth == pytest.approx(side.pos[1] - 2)
     for first, second in zip(fronts, fronts[1:]):
         assert second.pos[2] - first.pos[2] - first.height == pytest.approx(3)
@@ -141,18 +141,18 @@ def test_project_backs_meet_in_bridge_and_leave_drawers_open(tmp_path):
         groove = next(g for g in side.grooves if g['kind'] == 'back_rabbet')
         assert side.pos[2] + groove['z'] == lower.pos[2]
     fronts = [boards[f'tower_drawer_{i}_front'] for i in range(5)]
-    assert [f.height for f in fronts] == [164] * 5
-    assert all(f.width == 594 for f in fronts)
+    assert [f.height for f in fronts] == [169] * 5
+    assert all(f.width == 596 for f in fronts)
     for board in boards.values():
         if board.fabrication and 'slide_' not in board.name:
             assert all(value == round(value) for value in (board.width, board.height, board.depth)), board.name
         for hole in board.holes:
             if hole.kind == 'handle':
-                assert hole.z - board.pos[2] == round(hole.z - board.pos[2])
+                assert (hole.z - board.pos[2]) * 2 == round((hole.z - board.pos[2]) * 2)
                 assert abs(hole.z - board.pos[2] - board.height / 2) <= 0.5
-    assert fronts[0].pos[2] == 16
-    assert boards['tower_bottom'].pos[2] + boards['tower_bottom'].height - fronts[0].pos[2] == 2
-    assert fronts[-1].pos[2] + fronts[-1].height == pytest.approx(floor.pos[2] + 3)
+    assert fronts[0].pos[2] == 3
+    assert boards['tower_bottom'].pos[2] + boards['tower_bottom'].height - fronts[0].pos[2] == 15
+    assert fronts[-1].pos[2] + fronts[-1].height == pytest.approx(floor.pos[2] + 15)
     for first, second in zip(fronts, fronts[1:]):
         assert second.pos[2] - first.pos[2] - first.height == pytest.approx(3)
     _, md, dxf = export(PROJECT, tmp_path)

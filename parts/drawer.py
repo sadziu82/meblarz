@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple
 import yaml
+from parts.front_rules import SIDE_REVEAL, END_REVEAL
 
 
 @dataclass
@@ -53,6 +54,14 @@ class Board:
     grooves: list[dict] = field(default_factory=list)
     fabrication: bool = True  # False for purchased equipment shown only in preview
     yaw: float = 0.0  # preview rotation about local Z at pos, degrees
+    opening: str = ''  # e.g. lift_up; construction/preview metadata
+    label: str = ''  # non-production equipment label
+    texture: str = ''  # project-relative image shown on this preview-only board
+    preview_shape: str = ''  # 'cylinder_z' for round purchased equipment
+    motion_parent: str = ''  # preview hardware follows this board's complete motion
+    preview_mesh: str = ''  # normalized OBJ, positioned/scaled by the preview board
+    cabinet_id: str = ''  # separate carcass identity for adjacent-cabinet joinery
+    cabinet_side: str = ''  # 'left' or 'right' outer cheek of that carcass
 
 
 @dataclass
@@ -65,6 +74,7 @@ class DrawerModel:
     joints: List[Tuple[str, str]] = field(default_factory=list)
     drawer_count: int = 0  # 0 = standalone drawer, >0 = dresser
     notes: List[str] = field(default_factory=list)
+    machining_issues: List[dict] = field(default_factory=list)
 
 
 _SLIDES_DB: dict | None = None
@@ -417,6 +427,12 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
             grooves=list(b.grooves),
             fabrication=b.fabrication,
             yaw=b.yaw,
+            opening=b.opening,
+            label=b.label,
+            texture=b.texture,
+            preview_shape=b.preview_shape,
+            motion_parent=b.motion_parent,
+            preview_mesh=b.preview_mesh,
         ))
     return result
 
@@ -458,11 +474,18 @@ def load_drawer(path: str) -> DrawerModel:
     bot_gap  = cfg['front']['bottom_gap']
 
     front_H = nh - top_gap - bot_gap
+    if cfg['front'].get('mount', 'inset') == 'overlay':
+        carcass_t = float(cfg['front'].get('carcass_thickness', board_thickness))
+        side_gap = SIDE_REVEAL - carcass_t
+        bot_gap = END_REVEAL - carcass_t
+        front_H = nh + 2 * carcass_t - 2 * END_REVEAL
+        inset = -(board_thickness + float(cfg['front'].get('carcass_gap', 2)))
 
     boards, joints, nl = _build_drawer(nw, front_H, nd, board_thickness, bot, slide_cfg,
                                        inset, side_gap, bot_gap,
                                        target_nl=target_nl,
-                                       handle=cfg['front'].get('handle'))
+                                       handle=cfg['front'].get('handle'),
+                                       box_bottom_offset=carcass_t + 2 if cfg['front'].get('mount') == 'overlay' else 2)
     boards = _center_model(boards)
 
     return DrawerModel(
