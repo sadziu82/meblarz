@@ -53,14 +53,13 @@ przelicza koszt. Drugie pozostawia wypełniony formularz bez przeliczenia; nie
 traktuj go jako zapisanego rozkroju pod trwałym adresem. Trzecie działa bez GUI.
 Skrypt nie dodaje zlecenia do koszyka ani nie składa zamówienia.
 
-### Weryfikacja i odtworzenie
+### Weryfikacja
 
 Wstaw adres własnego zapisanego rozkroju:
 
 ```bash
 cut_url='https://www.meble.pl/rozkroj,r12345678'
 DISPLAY=:98 python cutting.py projects/drawer.yaml --vendor meble.pl --verify "$cut_url"
-DISPLAY=:98 python cutting.py projects/drawer.yaml --vendor meble.pl --recreate "$cut_url"
 ```
 
 `--verify` odczytuje formularz i porównuje go z bieżącym YAML-em: materiały,
@@ -68,12 +67,6 @@ grubości, formatki, wymiary, ilości, obrzeża, słoje i nawierty, w tym brakuj
 lub nadmiarowe. Grupy materiałowe są porównywane w kolejności planu, formatki
 wewnątrz grup po nazwach. Nie poprawia danych na stronie. Różnice trafiają do
 `weryfikacja.md`, a odczyt do `odczyt.json`.
-
-`--recreate` zastępuje wszystkie formatki, obrzeża i obróbkę danymi z YAML-a,
-usuwa zbędne grupy materiałów i dodaje potrzebne. Przed zmianami zapisuje
-kopię formularza; po przeliczeniu ponownie odczytuje wynik i sprawdza zgodność.
-**Standardowy zapis meble.pl nadaje nowy numer rozkroju.** Skrypt podaje nowy
-adres i zapisuje powiązanie w `odtworzenie.json`; nie obiecuje nadpisania starego URL-a.
 
 ### Eksport plików produkcyjnych
 
@@ -99,15 +92,12 @@ krawędź osobno w formularzu.
 | `--output-dir KATALOG` | oba | Katalog wyników; `export.py`: domyślnie `exports`; `cutting.py`: `exports/NAZWA-meblepl-DATA-CZAS` |
 | `--dry-run` | cutting | Wyłącznie lokalny plan i raport |
 | `--verify URL` | cutting | Odczyt i porównanie zapisanego rozkroju |
-| `--recreate URL` | cutting | Odtworzenie całej zawartości na podstawie YAML-a |
 | `--no-calculate` | cutting | Wypełnienie bez wyceny |
 | `--close` | cutting | Zamknięcie okna po wykonaniu pracy |
 | `--headless` | cutting | Bez GUI i bez pozostawiania okna; nie wymaga DISPLAY |
 | `--help` | oba | Pomoc |
 
-`--verify` i `--recreate` wykluczają się. Nie można łączyć `--verify` z
-`--dry-run`, ani `--recreate` z `--no-calculate`. `--recreate URL --dry-run`
-wykonuje tylko lokalne sprawdzenie projektu.
+Nie można łączyć `--verify` z `--dry-run`.
 
 Po zwykłym wykonaniu `cutting.py` pozostawia przeglądarkę do kontroli.
 Ctrl+C pozwala dokończyć bieżącą operację i zamknąć okno; powtórne Ctrl+C nie
@@ -229,7 +219,6 @@ nie tworzy dodatkowych formatek rozkroju.
 oraz czynności montażowe. Zwykłe wypełnienie zapisuje również `plyta-N.csv`,
 `verified-fields.json`, `wynik.txt` i `podglad.png`. Błędy zapisują `blad.txt`
 i, jeśli strona pozostaje dostępna, `blad.html` oraz `blad.png`.
-Odtworzenie dodatkowo zapisuje `przed-odtworzeniem*` i `odtworzenie.json`.
 
 Dla rozkroju uzgodniono:
 
@@ -254,8 +243,7 @@ możliwe, lecz eksport produkcyjny blokuje się do ich rozstrzygnięcia.
 
 Po błędzie sprawdź raport i zachowane okno. Nie ma automatycznego wznowienia
 od ostatniego otworu; ponowne zwykłe uruchomienie zaczyna nowy formularz.
-`--recreate` wymaga zapisanego URL-a i odtwarza całość. Przed zamówieniem
-sprawdź wynik, także osobne prace wskazane w raporcie.
+Przed zamówieniem sprawdź wynik, także osobne prace wskazane w raporcie.
 
 ### Prywatność plików lokalnych
 

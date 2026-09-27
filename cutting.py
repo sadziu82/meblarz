@@ -269,38 +269,13 @@ class Configurator:
             raise ConfiguratorError('Rozkrój różni się od YAML-a:\n'+'\n'.join(errors[:20]))
         print(scope, flush=True)
 
-    def prepare_recreate(self, plan):
-        self.expand_all()
-        # Keep the original form locally before replacing any rows/materials.
-        (self.output/'przed-odtworzeniem.html').write_text(self.page.content())
-        (self.output/'przed-odtworzeniem-url.txt').write_text(self.page.url)
-        self.page.screenshot(path=str(self.output/'przed-odtworzeniem.png'))
-        fields = self.page.locator('input,select').evaluate_all(
-            '(es)=>es.map(e=>({id:e.id,name:e.name,value:e.value,checked:e.checked}))')
-        (self.output/'przed-odtworzeniem-pola.json').write_text(json.dumps(fields,ensure_ascii=False,indent=2))
-        ids = self.page.locator('[id^="div_plyta_"]').evaluate_all(
-            '(es)=>es.map(e=>Number(e.id.split("_").pop())).filter(Number.isFinite)')
-        # Imports replace all boards in retained groups; remove obsolete groups too.
-        for p in sorted(ids,reverse=True):
-            if p <= len(plan['groups']):
-                continue
-            self.shutdown.check()
-            self.page.once('dialog', lambda dialog: dialog.accept())
-            self.page.locator(f'[onclick="usunPlyte(\'{p}\');"]').click()
-            self.settle()
-        self.expected.clear()
-        print('Odtwarzanie rozkroju: zastępuję wszystkie formatki danymi z YAML-a.',flush=True)
-
-    def run(self,plan,calculate=True,recreate_url=None):
-        self.page.goto(recreate_url or URL,wait_until='domcontentloaded')
+    def run(self,plan,calculate=True):
+        self.page.goto(URL,wait_until='domcontentloaded')
         cookie=self.page.get_by_role('button',name='Allow selection',exact=True)
         try:
             cookie.wait_for(timeout=5000);cookie.click()
         except Exception:
             pass
-        if recreate_url:
-            self.page.locator('[id^="plyta_kod_produktu_"]').first.wait_for(state='attached')
-            self.prepare_recreate(plan)
         for p,group in enumerate(plan['groups'],1):
             self.select_material(p,group)
             self.import_rectangles(p,group)
@@ -318,17 +293,6 @@ class Configurator:
             collapse=self.page.get_by_text('Zwiń wszystkie formatki',exact=False)
             if collapse.count() and collapse.first.is_visible():collapse.first.click()
             self.page.get_by_text('Podsumowanie kosztów zlecenia:',exact=False).scroll_into_view_if_needed()
-        if recreate_url:
-            result_url = self.page.url
-            self.verify_saved(plan,result_url)
-            source_id = re.search(r'/rozkroj,r(\d+)',recreate_url).group(1)
-            result_match = re.search(r'/rozkroj,r(\d+)',result_url)
-            same_id = bool(result_match and result_match.group(1)==source_id)
-            result = dict(source_url=recreate_url,result_url=result_url,same_id=same_id)
-            (self.output/'odtworzenie.json').write_text(json.dumps(result,ensure_ascii=False,indent=2))
-            if not same_id:
-                print(f'Meble.pl nadało nowy numer rozkroju. Adres źródłowy: {recreate_url}\n'
-                      f'Odtworzony rozkrój: {result_url}. Nie nadpisano starego adresu.',flush=True)
         (self.output/'wynik.txt').write_text(self.page.url+'\n\n'+self.page.locator('body').inner_text())
         self.page.screenshot(path=str(self.output/'podglad.png'))
         print(f'Gotowe: {self.page.url}\nRaport: {self.output / "raport.md"}',flush=True)
@@ -339,23 +303,17 @@ def main(argv=None):
     parser.add_argument('--vendor', required=True, choices=['meble.pl'],
                         help='dostawca rozkroju (wymagany)')
     parser.add_argument('project',type=Path)
-    mode=parser.add_mutually_exclusive_group()
-    mode.add_argument('--recreate', metavar='URL', help='Zastąp wszystkie formatki istniejącego rozkroju danymi z YAML-a')
-    mode.add_argument('--verify', metavar='URL', help='Porównaj istniejący rozkrój z YAML-em bez zmieniania formularza')
+    parser.add_argument('--verify', metavar='URL', help='Porównaj istniejący rozkrój z YAML-em bez zmieniania formularza')
     parser.add_argument('--dry-run',action='store_true',help='Tylko walidacja i lokalny raport, bez przeglądarki')
     parser.add_argument('--output-dir',type=Path)
     parser.add_argument('--no-calculate',action='store_true',help='Wypełnij formularz bez wyliczania wyceny')
     parser.add_argument('--close',action='store_true',help='Zamknij przeglądarkę po zakończeniu (np. do testów)')
     parser.add_argument('--headless',action='store_true',help='Bez GUI; implikuje --close')
     args=parser.parse_args(argv)
-    for name in ('verify','recreate'):
-        url=getattr(args,name)
-        if url and not re.fullmatch(r'https://(?:www\.)?meble\.pl/rozkroj,r\d+(?:,\d+)?/?', url):
-            parser.error(f'--{name} wymaga adresu https://www.meble.pl/rozkroj,rNUMER')
+    if args.verify and not re.fullmatch(r'https://(?:www\.)?meble\.pl/rozkroj,r\d+(?:,\d+)?/?', args.verify):
+        parser.error('--verify wymaga adresu https://www.meble.pl/rozkroj,rNUMER')
     if args.verify and args.dry_run:
         parser.error('--verify nie można łączyć z --dry-run')
-    if args.recreate and args.no_calculate:
-        parser.error('--recreate wymaga przeliczenia, aby zapisać odtworzony rozkrój')
     try:
         plan=make_plan(args.project)
         output=save_plan(plan,args.output_dir or Path('exports')/(args.project.stem+'-meblepl-'+datetime.now().strftime('%Y%m%d-%H%M%S')))
@@ -384,7 +342,7 @@ def main(argv=None):
             if args.verify:
                 configurator.verify_saved(plan,args.verify)
             else:
-                configurator.run(plan,not args.no_calculate,args.recreate)
+                configurator.run(plan,not args.no_calculate)
         except StopRequested:
             exit_code=130
         except Exception as exc:

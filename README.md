@@ -718,22 +718,6 @@ Porównanie zapisanego rozkroju z aktualnym YAML-em (bez zmiany danych na stroni
 DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --verify https://www.meble.pl/rozkroj,r12345678
 ```
 
-Odtworzenie wszystkich formatek z YAML-a na podstawie istniejącego rozkroju:
-
-```bash
-DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --recreate https://www.meble.pl/rozkroj,r12345678
-```
-
-`--recreate` zastępuje listy formatek wraz z obróbką i obrzeżami, usuwa zbędne
-płyty i dodaje wymagane materiały. Przed zmianą zapisuje kopię HTML, pól formularza,
-adresu i zrzut ekranu (`przed-odtworzeniem*`). Po przeliczeniu ponownie odczytuje
-zapisany rozkrój i porównuje go z planem.
-**Meble.pl podczas standardowego przeliczania nadaje nowy numer rozkroju** —
-nie można obiecać zachowania wejściowego URL-a. Skrypt wypisuje wynikowy adres,
-a `odtworzenie.json` zawiera adres źródłowy, wynikowy i informację, czy numer
-pozostał ten sam. Ta opcja nie łączy się z `--verify` ani `--no-calculate`.
-`--recreate URL --dry-run` sprawdza tylko lokalny projekt, bez zmian w serwisie.
-
 `--verify` sprawdza materiał i grubość, nazwy i liczbę formatek, wymiary,
 ilości, ustawienie słojów, oklejane krawędzie, grubość/dekor obrzeża oraz
 nawierty (strona, współrzędne, średnica, głębokość, także brakujące i nadmiarowe).

@@ -17,3 +17,13 @@ def test_export_with_vendor(tmp_path):
     source=Path(__file__).resolve().parents[1]/'projects/drawer.yaml'
     export_main([str(source),'--vendor','meble.pl','--output-dir',str(tmp_path)])
     assert (tmp_path/'drawer-meblepl.csv').exists()
+
+
+@pytest.mark.parametrize('flags', [
+    ['--verify', 'https://example.org/rozkroj,r123'],
+    ['--verify', 'https://www.meble.pl/rozkroj,r12345678', '--dry-run'],
+])
+def test_verify_arguments_rejected_before_loading_project(flags):
+    with pytest.raises(SystemExit) as error:
+        cutting_main(['missing.yaml', '--vendor', 'meble.pl', *flags])
+    assert error.value.code == 2
