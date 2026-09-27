@@ -329,3 +329,15 @@ def test_axis_rear_connectors_bridge_gap_and_cover_catalogue_holes(tmp_path, nl,
                 assert _movable_group(part) == prefix
                 assert _is_slide_visualisation(part)
                 assert not part.holes and not part.joint_holes
+
+
+def test_hinge_cups_leave_catalogue_three_mm_edge_margin(tmp_path):
+    model, boards, _ = load(tmp_path)
+    for door in (b for b in model.boards if b.opening in ('hinge_left', 'hinge_right', 'lift_up')):
+        for cup in (h for h in door.holes if h.kind == 'hinge_cup'):
+            distance = (door.pos[2] + door.height - cup.z if door.opening == 'lift_up'
+                        else cup.x - door.pos[0] if door.opening == 'hinge_left'
+                        else door.pos[0] + door.width - cup.x)
+            assert distance == pytest.approx(20.5)
+            assert distance - cup.diameter / 2 == pytest.approx(3)
+            assert door.depth - cup.depth == pytest.approx(6)

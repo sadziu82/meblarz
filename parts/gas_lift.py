@@ -52,7 +52,8 @@ def add_gas_lifts(door, left_side, right_side, top, config):
     if spec['pilot_depth'] >= min(door.depth, left_side.width, right_side.width):
         raise ValueError(f'{model}: pilot drilling exceeds panel thickness')
     top_underside = top.pos[2]
-    front_z = top_underside - layout['l']
+    # GTV p.2: L ends at the UPPER fixing screw, not the ball centre.
+    front_z = top_underside - layout['l'] - spec['fixing_spacing'] / 2
     upper_side_z = top_underside - layout['h']
     result = []
     for side, sign in ((left_side, 1), (right_side, -1)):

@@ -43,7 +43,7 @@ def test_gas_lifts_follow_flap_on_both_sides(tmp_path):
     front_holes = [h for h in door.holes if h.kind == 'gas_lift_mount']
     assert len(front_holes) == 4
     assert {(h.x - door.pos[0], top.pos[2] - h.z) for h in front_holes} == {
-        (40, 57), (40, 89), (706, 57), (706, 89)}
+        (40, 73), (40, 105), (706, 73), (706, 105)}
     assert all((h.y, h.direction, h.diameter, h.depth) ==
                (door.pos[1] + door.depth, '+y', 2.5, 10) for h in front_holes)
     for name in ('kitchen_left_side', 'kitchen_left_right_side', 'fridge_top_lift_door'):
@@ -71,7 +71,7 @@ def test_gas_lifts_follow_flap_on_both_sides(tmp_path):
     assert {top_90.pos[2] - h.z for h in side_90.holes
             if h.kind == 'gas_lift_mount'} == {217, 249}
     assert {top_90.pos[2] - h.z for h in boards_90['fridge_top_lift_door'].holes
-            if h.kind == 'gas_lift_mount'} == {38, 70}
+            if h.kind == 'gas_lift_mount'} == {54, 86}
 
     config['kitchen_tall_unit']['gas_lifts']['opening_angle'] = 80
     path.write_text(yaml.safe_dump(config))

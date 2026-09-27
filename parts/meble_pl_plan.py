@@ -97,9 +97,9 @@ def make_plan(source):
         if board.corner_radius and any(board.rounded_front_corners):
             raise ValueError(f'{board.name}: skrypt obsługuje obecnie formatki prostokątne; zaokrąglenie wymaga ręcznej konfiguracji')
         # Supplier pilot holes are intentional substitutions, not hardware dimensions.
-        operations = [(h,3 if h.kind == 'slide' else h.diameter,
-                       3 if h.kind == 'slide' else h.depth,
-                       False if h.kind == 'slide' else h.through,h.kind) for h in board.holes]
+        operations = [(h,3 if h.kind in ('slide', 'gas_lift_mount') else h.diameter,
+                       3 if h.kind in ('slide', 'gas_lift_mount') else h.depth,
+                       False if h.kind in ('slide', 'gas_lift_mount') else h.through,h.kind) for h in board.holes]
         for h in board.joint_holes:
             if h.hole_type=='dowel':
                 operations.append((h,8,11 if h.element==1 else 27,False,'kołek'))
@@ -125,6 +125,11 @@ def make_plan(source):
            for board in boards for h in board.joint_holes):
         plan['manual_finishing'].append(
             'Pogłębienia pod łby konfirmatów do wykonania samodzielnie.')
+    if any(h.kind == 'gas_lift_mount' for b in boards for h in b.holes):
+        plan['manual_finishing'].append(
+            'Mocowania podnośników gazowych: meble.pl wykonuje wyłącznie znaczniki Ø3 × 3 mm. '
+            'Właściwe nawierty Ø2,5 × 10 mm wykonać samodzielnie według modelu; '
+            'pierwsze 3 mm otworu pozostaną poszerzone do Ø3 mm.')
     return plan
 
 

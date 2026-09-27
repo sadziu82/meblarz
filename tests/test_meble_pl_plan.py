@@ -106,3 +106,26 @@ def test_plan_source_does_not_expose_local_directories(tmp_path):
     assert plan['source'] == 'drawer.yaml'
     save_plan(plan, tmp_path / 'report')
     assert str(tmp_path) not in (tmp_path / 'report' / 'plan.json').read_text()
+
+
+def test_gas_lift_marks_are_in_supplier_plan_without_changing_model(tmp_path):
+    from parts.kitchen_tall_unit import load_kitchen_tall_unit
+    project = ROOT / 'projects/kitchen_tall_unit.yaml'
+    model = load_kitchen_tall_unit(project)
+    plan = make_plan(project)
+    target_boards = {b['name']: b for g in plan['groups'] for b in g['boards']}
+    count = 0
+    for board in model.boards:
+        for hole in board.holes:
+            if hole.kind != 'gas_lift_mount':
+                continue
+            assert (hole.diameter, hole.depth, hole.through) == (2.5, 10, False)
+            expected, error = drill(board, hole, 3, 3)
+            assert error is None
+            assert expected in target_boards[board.name]['drills']
+            count += 1
+    assert count == 8
+    assert not any(item['operation'] == 'gas_lift_mount' for item in plan['manual'])
+    assert any('Ø3 × 3' in item and 'Ø2,5 × 10' in item for item in plan['manual_finishing'])
+    save_plan(plan, tmp_path)
+    assert 'pierwsze 3 mm' in (tmp_path / 'raport.md').read_text()

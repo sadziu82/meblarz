@@ -265,3 +265,9 @@ Katalog `exports/` nie jest wersjonowany: zawiera prywatne adresy rozkrojów,
 kopie formularzy, zrzuty ekranu i profil przeglądarki (w tym dane sesji).
 Nie publikuj go w całości. Starsze plany mogą zawierać pełne lokalne ścieżki.
 Nagrania ekranu i pliki `.env` również są pomijane przez Git.
+
+Mocowania podnośników gazowych w szkicu meble.pl są oznaczane nawiertami
+Ø3 × 3 mm. Model i dokumentacja obróbki zachowują docelowe Ø2,5 × 10 mm;
+dokończenie wiercenia jest czynnością ręczną zapisaną w raporcie. Początkowe
+3 mm otworu pozostaje szersze (Ø3 mm). To uzgodniony znacznik, nie zmiana
+szablonu producenta ani pełny otwór montażowy.

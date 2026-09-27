@@ -7,7 +7,7 @@ gas_lifts:
     mounting_options:
       75: {h: 237, l: 73, c: 24, w: 275}
       90: {h: 217, l: 54, c: 24, w: 275}
-    # H: top underside to upper carcass fixing; L: to front mounting centre.
+    # H: top underside to upper carcass fixing; L: to upper front fixing screw.
     # C: front mounting centre from inner side plane; W: minimum cabinet height.
     side_front_setback: 19.5
     fixing_spacing: 32

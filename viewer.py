@@ -1290,7 +1290,7 @@ def _board_info_text(board: Board, level: int) -> str:
         for h in board.holes:
             lx = h.x - board.pos[0]
             ly = h.z - board.pos[2]
-            lines.append(f"   slide   x={lx:.1f}  y={ly:.1f}  ø{h.diameter:.1f}  depth={h.depth:.1f}")
+            lines.append(f"   {h.kind}   x={lx:.1f}  y={ly:.1f}  ø{h.diameter:.1f}  depth={h.depth:.1f}")
         for jh in board.joint_holes:
             lx = jh.x - board.pos[0]
             ly = jh.z - board.pos[2]

@@ -94,3 +94,13 @@ def test_double_click_cancels_single_click_and_release(app):
     GLWidget._finish_single_click(gl)
     gl._pick.assert_called_once_with(10, 20)
     parent.close()
+
+
+def test_board_info_identifies_lift_bores():
+    from parts.drawer import Board, Hole
+    from viewer import _board_info_text
+    board = Board('flap', 700, 350, 18, (0, 0, 0))
+    board.holes.append(Hole(40, 18, 200, 2.5, 10, '+y', 'gas_lift_mount'))
+    text = _board_info_text(board, 2)
+    assert 'gas_lift_mount' in text
+    assert 'slide' not in text
