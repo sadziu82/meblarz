@@ -670,7 +670,7 @@ DISPLAY=:98 python cutting.py --vendor meble.pl projects/kitchen_tall_unit.yaml
 ```
 
 Skrypt otwiera osobne okno Chromium na pełnym ekranie, wybiera materiały,
-importuje formatki, ustawia obrzeża i obsługiwane nawierty, sprawdza zapisane
+importuje formatki, ustawia obrzeża, obsługiwane nawierty i wręgi, sprawdza zapisane
 wartości oraz przelicza koszt. Nie dodaje zlecenia do koszyka i nie zamawia.
 Pozostawia przeglądarkę do sprawdzenia; Ctrl+C kończy skrypt i zamyka jego okno.
 Zmiana układu strony, brak grubości/dekoru lub odrzucenie wymiaru przerywa pracę
@@ -720,14 +720,16 @@ DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --verify ht
 
 `--verify` sprawdza materiał i grubość, nazwy i liczbę formatek, wymiary,
 ilości, ustawienie słojów, oklejane krawędzie, grubość/dekor obrzeża oraz
-nawierty (strona, współrzędne, średnica, głębokość, także brakujące i nadmiarowe).
+nawierty (strona, współrzędne, średnica, głębokość) oraz wręgi
+(strona, krawędź, szerokość, głębokość, odstęp i końce). Wykrywa również
+brakujące i nadmiarowe operacje.
 Zapisuje `weryfikacja.md` i odczyt formularza `odczyt.json`. Różnice dają kod
-wyjścia 1; zgodność w sprawdzanym zakresie — 0. Frezy i pozostałe operacje
-z `raport.md` nadal wymagają osobnej kontroli; zgodność szkicu nie oznacza
+wyjścia 1; zgodność w sprawdzanym zakresie — 0. Nieobsługiwane frezy i pozostałe
+prace ręczne z `raport.md` nadal wymagają osobnej kontroli; zgodność szkicu nie oznacza
 kompletności dokumentacji produkcyjnej. Grupy materiałów są porównywane
 w kolejności z planu, formatki wewnątrz grup — po nazwach.
 
-Pasek postępu nawiertów odświeża się po każdym zapisanym otworze; w logu
+Osobne paski postępu nawiertów i wręgowania odświeżają się po każdej zapisanej operacji; w logu
 bez terminala każdy krok zajmuje osobny wiersz. Ctrl+C zgłasza zakończenie
 pracy po bieżącej operacji przeglądarki; kolejne Ctrl+C nie przerywa sprzątania.
 
@@ -739,8 +741,10 @@ konfirmaty w krawędziach mają piloty Ø4 × 35 mm, a na płaszczyznach
 otwory przelotowe Ø5 mm; prowadnice zaznaczenia
 Ø3 × 3 mm, a pogłębienia pod łby konfirmatów wykonuje użytkownik samodzielnie
 (skrypt ich nie zleca). Wymiary okuć w modelu pozostają bez zmian.
-Wręgi/frezy oraz nieobsługiwane
-nawierty są wyszczególnione do ręcznego uzupełnienia/wykonania osobno.
+Wręgi zgodne z możliwościami formularza są dodawane automatycznie.
+Nieobsługiwane wręgi/frezy i nawierty są wyszczególnione w raporcie
+z przyczyną pominięcia. Parametry oraz ograniczenia opisuje
+[dokumentacja wręgowania](docs/cutting_and_materials.md#wręgowanie-w-formularzu).
 Zaokrąglone formatki powodują błąd — skrypt nie zastępuje ich prostokątem.
 
 To **szkic częściowego rozkroju do przeglądu**, zwłaszcza gdy model zgłasza

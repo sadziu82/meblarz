@@ -84,8 +84,33 @@ def compare_plan(plan, snapshot):
                 check(f'{name}: dekor obrzeża', value(f'obrzeze_kolor_{suffix}_all'), value(f'plyta_kolor_{p}'))
                 structure = [e['value'] for e in fields.values() if e.get('name') == f'plyta_struktura[{p}]' and e.get('checked')]
                 check(f'{name}: struktura obrzeża', value(f'obrzeze_struktura_{suffix}_all'), structure[0] if len(structure) == 1 else None)
+            expected_grooves = b.get('grooves', [])
+            check(f'{name}: wręgowanie włączone', checked(f'wregowanie_{suffix}'), bool(expected_grooves))
+            actual_grooves = []
             if checked(f'wregowanie_{suffix}'):
-                errors.append(f'{name}: wręgowanie wymaga osobnej weryfikacji (poza automatycznym planem)')
+                numbers = sorted({m[1] for key in fields
+                                  if (m := re.fullmatch(rf'wregowania_{suffix}_(\d+)_powierzchnia', key))})
+                for n in numbers:
+                    prefix = f'wregowania_{suffix}_{n}_'
+                    entry = {k: value(prefix+k) for k in (
+                        'powierzchnia', 'wregowanie_bok', 'wregowanie_glebokosc',
+                        'wregowanie_szerokosc', 'wregowanie_odleglosc')}
+                    modes = [kind for kind in ('przelot', 'nprzelot')
+                             if checked(prefix+'wregowanie_rodzaj_'+kind)]
+                    entry['wregowanie_rodzaj'] = modes[0] if len(modes) == 1 else None
+                    for end in ('x1', 'x2'):
+                        through = entry['wregowanie_rodzaj'] == 'przelot' or checked(prefix+'wregowanie_przelot_'+end)
+                        entry['wregowanie_przelot_'+end] = through
+                        entry['wregowanie_'+end] = 0 if through else value(prefix+'wregowanie_'+end)
+                    actual_grooves.append(entry)
+            def groove_signature(entry):
+                return json.dumps({k: normalized(v) for k, v in entry.items()}, sort_keys=True)
+            expected_groove_counts = Counter(map(groove_signature, expected_grooves))
+            actual_groove_counts = Counter(map(groove_signature, actual_grooves))
+            for label, delta in [('brak wręgu', expected_groove_counts-actual_groove_counts),
+                                 ('nadmiarowy/inny wręg', actual_groove_counts-expected_groove_counts)]:
+                for groove, count in delta.items():
+                    errors.append(f'{name}: {label} ({count}×): {groove}')
             mode = value(f'typ_frontu_{suffix}')
             if mode not in ('', None, 'nawierty_dowolne'):
                 errors.append(f'{name}: nieobsługiwany szablon obróbki {mode!r}')

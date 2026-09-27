@@ -25,6 +25,7 @@ def _outline(config, board, **geometry):
     groove_width, groove_depth = _guide(config, board)
     groove = dict(kind='ventilation_cut_guide', groove_width=groove_width,
                   depth=groove_depth,
+                  integer_edge_offsets=bool(guide.get('integer_edge_offsets', False)),
                   max_edge_offset=float(guide.get('max_edge_offset', 50)),
                   marker_diameter=float(guide.get('marker_diameter', 3)),
                   marker_depth=float(guide.get('marker_depth', 2)),
@@ -143,7 +144,21 @@ def _guide_segments(board, groove):
         axis_size = face_height if y1 == y2 else board.width
         axis_coord = y1 if y1 == y2 else x1
         distance = min(axis_coord, axis_size - axis_coord)
-        yield line, rect, distance <= groove['max_edge_offset']
+        routable = distance <= groove['max_edge_offset']
+        if routable and groove.get('integer_edge_offsets', False):
+            # Explicit project policy: snap the clear edge distance, keeping
+            # cutter width and along-edge endpoints unchanged in preview/DXF.
+            rect = list(rect)
+            coordinate = 1 if y1 == y2 else 0
+            low, high = rect[coordinate], rect[coordinate + 2]
+            near_high = axis_size - high < low
+            clear = axis_size - high if near_high else low
+            target = int(clear + 0.5)
+            shift = clear - target if near_high else target - clear
+            rect[coordinate] += shift
+            rect[coordinate + 2] += shift
+            rect = tuple(rect)
+        yield line, rect, routable
 
 
 def routable_guide_rectangles(board, groove):

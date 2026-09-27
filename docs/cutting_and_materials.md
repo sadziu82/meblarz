@@ -48,7 +48,7 @@ DISPLAY=:98 python cutting.py examples/cutting_drawer.yaml --vendor meble.pl --n
 python cutting.py examples/cutting_drawer.yaml --vendor meble.pl --headless --output-dir exports/drawer-batch
 ```
 
-Pierwsze polecenie wprowadza formatki, obrzeża i obsługiwane nawierty, a potem
+Pierwsze polecenie wprowadza formatki, obrzeża, obsługiwane nawierty i wręgi, a potem
 przelicza koszt. Drugie pozostawia wypełniony formularz bez przeliczenia; nie
 traktuj go jako zapisanego rozkroju pod trwałym adresem. Trzecie działa bez GUI.
 Skrypt nie dodaje zlecenia do koszyka ani nie składa zamówienia.
@@ -63,7 +63,7 @@ DISPLAY=:98 python cutting.py projects/drawer.yaml --vendor meble.pl --verify "$
 ```
 
 `--verify` odczytuje formularz i porównuje go z bieżącym YAML-em: materiały,
-grubości, formatki, wymiary, ilości, obrzeża, słoje i nawierty, w tym brakujące
+grubości, formatki, wymiary, ilości, obrzeża, słoje, nawierty i wręgi, w tym brakujące
 lub nadmiarowe. Grupy materiałowe są porównywane w kolejności planu, formatki
 wewnątrz grup po nazwach. Nie poprawia danych na stronie. Różnice trafiają do
 `weryfikacja.md`, a odczyt do `odczyt.json`.
@@ -259,3 +259,60 @@ Mocowania podnośników gazowych w szkicu meble.pl są oznaczane nawiertami
 dokończenie wiercenia jest czynnością ręczną zapisaną w raporcie. Początkowe
 3 mm otworu pozostaje szersze (Ø3 mm). To uzgodniony znacznik, nie zmiana
 szablonu producenta ani pełny otwór montażowy.
+
+### Wręgowanie w formularzu
+
+`cutting.py` automatycznie odczytuje wręgi z geometrii wygenerowanej z YAML-a.
+Nie trzeba przepisywać listy obróbek do konfiguracji dostawcy. Obsługuje rowki
+LED/przewodów, wręgi pod plecy, rowki dna i trasowanie wentylacji, o ile ich
+geometria odpowiada możliwościom formularza:
+
+- szerokości 3,2 / 4,2 / 10,2 mm (sprawdzone w formularzu 27.09.2026);
+- głębokość 2–13 mm co 1 mm, mniejsza niż grubość płyty;
+- odstęp **bliższej krawędzi wręgu** od krawędzi płyty 0–50 mm co 1 mm;
+- co najmniej 75 mm płyty za wręgiem do przeciwnej krawędzi (granica
+  wyznaczona próbami w aktywnym formularzu);
+- przebieg przez całą długość albo zatrzymany z jednej/dwóch stron;
+- dla wręgu nieprzelotowego długość przynajmniej 99 mm zgodnie z walidacją
+  końców X1/X2 formularza;
+- najwyżej jeden wręg na danej powierzchni przy tej samej krawędzi.
+
+„Przelotowy” oznacza tutaj dojście rowka do końców formatki, a nie przebicie
+jej grubości. X1/X2 są odległościami od końców: lewo/prawo dla rowka poziomego,
+góra/dół dla pionowego. Strona A/B odpowiada tym samym osiom co nawierty.
+Wręg na tylnej krawędzi boku jest przeliczany na obróbkę jego szerokiej
+powierzchni: np. wsunięcie pleców 12 mm i grubość 3,2 mm daje rowek
+szerokości 3,2 mm, głębokości 12 mm, bez odsunięcia od tylnej krawędzi.
+
+Nieobsługiwane parametry pozostają w raporcie osobno z przyczyną i geometrią
+odcinka. Skrypt nie zamienia sam frezu 10 mm na 10,2 mm ani 3 mm na 3,2 mm.
+Dwa odcinki przy tej samej krawędzi wymagają zmiany projektu. Formularz może
+nałożyć dodatkowe ograniczenia w zależności od innych obróbek; odrzucenie
+wartości przerywa pracę, zamiast zapisywać zmienione wymiary.
+
+W projekcie kuchennym włączono uzgodnione zaokrąglanie **odstępów znaczników
+wentylacji**, zachowując szerokość frezu i jego końce:
+
+```yaml
+kitchen_tall_unit:
+  fridge_ventilation:
+    guide:
+      width: 3.2
+      depth: 2
+      integer_edge_offsets: true
+```
+
+Domyślnie `integer_edge_offsets` jest wyłączone. Zmiana działa w geometrii
+modelu, więc podgląd, DXF i plan rozkroju korzystają z tych samych odcinków.
+Wręgi i nawierty trasujące nie usuwają środka otworu wentylacyjnego — nadal
+wymaga on ręcznego wycięcia. Raport oddziela zlecane wręgi od prac ręcznych.
+
+`--verify URL` porównuje stronę, krawędź, szerokość, głębokość, odstęp,
+tryb i oba końce każdego wręgu; wykrywa także braki i nadmiarowe odcinki.
+Podczas wpisywania widoczny jest osobny pasek postępu „Wręgowanie”.
+
+W obecnej kuchni automat zleca trzy wręgi trasujące: w płycie dolnej, górnej
+i przegrodzie nad lodówką. Dwa wręgi w cokole wysokości 100 mm zostają
+w raporcie jako prace osobne: przy odstępie 28 mm i szerokości 3,2 mm
+pozostaje 68,8 mm, mniej niż wymagane 75 mm. Nie zmieniamy samodzielnie
+wysokości cokołu ani położenia otworu wentylacyjnego.

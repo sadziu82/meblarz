@@ -20,6 +20,7 @@ kitchen_tall_unit:
     guide: # Obrys do ręcznego wycięcia; wręg tylko do 50 mm od krawędzi.
       width: 3.2
       depth: 2
+      integer_edge_offsets: true # Odstęp wręgu od krawędzi w pełnych mm (meble.pl).
       max_edge_offset: 50
       marker_diameter: 3
       marker_depth: 2 # Płytki znacznik, nie otwór przelotowy.

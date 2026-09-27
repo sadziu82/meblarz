@@ -85,10 +85,10 @@ class Configurator:
         if error.count():
             raise ConfiguratorError(error.inner_text())
 
-    def set_values(self, fields, trigger):
+    def set_values(self, fields, trigger, checks=None):
         """Fill one complete UI row before firing its normal change/validation event."""
         self.shutdown.check()
-        self.page.evaluate('''({fields,trigger}) => {
+        self.page.evaluate('''({fields,trigger,checks}) => {
             for (const [id,value] of Object.entries(fields)) {
                 const e=document.getElementById(id);
                 if (!e || !['INPUT','SELECT'].includes(e.tagName)) throw Error('Missing field '+id);
@@ -96,13 +96,22 @@ class Configurator:
                     throw Error('Unsupported option '+id+'='+value);
                 e.value=value;
             }
+            for (const [id,checked] of Object.entries(checks)) {
+                const e=document.getElementById(id);
+                if (!e || !['checkbox','radio'].includes(e.type)) throw Error('Missing switch '+id);
+                e.checked=checked;
+            }
             document.getElementById(trigger).dispatchEvent(new Event('change',{bubbles:true}));
-        }''', dict(fields=fields,trigger=trigger))
+        }''', dict(fields=fields,trigger=trigger,checks=checks or {}))
         self.settle()
         for key,value in fields.items():
             actual = self.page.locator('#'+key).input_value()
             if actual != value:
                 raise ConfiguratorError(f'Formularz zmienił {key}: {value!r} → {actual!r}')
+        for key, checked in (checks or {}).items():
+            if self.page.locator('#'+key).is_checked() != checked:
+                raise ConfiguratorError(f'Formularz zmienił zaznaczenie {key}')
+            self.remember(key, checked=checked)
         self.expected.update({k:dict(value=v) for k,v in fields.items()})
 
     def remember(self, element_id, value=None, checked=None):
@@ -229,6 +238,33 @@ class Configurator:
                 self.set_values(fields,prefix+'glebokosc')
                 progress(label, n, len(holes))
 
+    def grooving(self, p, i, board):
+        grooves = board.get('grooves', [])
+        if not grooves:
+            return
+        # The same custom-machining panel contains both drills and grooves.
+        if self.page.locator(f'#typ_frontu_{p}_{i}').input_value() != 'nawierty_dowolne':
+            self.page.locator(f'#div_nawierty_dowolne_{p}_{i}').click()
+            self.settle()
+        enabled = f'wregowanie_{p}_{i}'
+        self.page.locator('#'+enabled).check()
+        self.settle()
+        self.remember(enabled, checked=True)
+        progress('Wręgowanie', 0, len(grooves))
+        for n, groove in enumerate(grooves, 1):
+            self.shutdown.check()
+            if n > 1:
+                self.page.locator(f"div[onclick=\"dodajNawiert('{p}','{i}','wregowania');\"]").click()
+                self.settle()
+            prefix = f'wregowania_{p}_{i}_{n}_'
+            fields = {prefix+k: (_number(v) if isinstance(v, (int, float)) else v)
+                      for k, v in groove.items() if not isinstance(v, bool) and k != 'wregowanie_rodzaj'}
+            checks = {prefix+k: v for k, v in groove.items() if isinstance(v, bool)}
+            checks.update({prefix+'wregowanie_rodzaj_'+kind: groove['wregowanie_rodzaj'] == kind
+                           for kind in ('przelot', 'nprzelot')})
+            self.set_values(fields, prefix+'wregowanie_glebokosc', checks)
+            progress('Wręgowanie', n, len(grooves))
+
     def verify(self):
         errors=self.page.evaluate('''expected=>Object.entries(expected).flatMap(([id,want])=>{
             const e=document.getElementById(id);
@@ -254,7 +290,7 @@ class Configurator:
         errors = compare_plan(plan, snapshot)
         (self.output/'odczyt.json').write_text(json.dumps(snapshot, ensure_ascii=False, indent=2))
         messages = ['Rozkrój różni się od planu.' if errors else 'Rozkrój zgodny z planem.',
-                    'Sprawdzono materiały, formatki, ilości, słoje, obrzeża i dostępne nawierty.']
+                    'Sprawdzono materiały, formatki, ilości, słoje, obrzeża, dostępne nawierty i wręgi.']
         messages.extend(plan.get('manual_finishing', []))
         if plan['manual']:
             messages.append(f'Pozostałe operacje do wykonania osobno: {len(plan["manual"])}. Szczegóły w raport.md.')
@@ -283,6 +319,7 @@ class Configurator:
                 print(f'  {i}/{len(group["boards"])} {b["name"]}: {len(b["drills"])} nawiertów',flush=True)
                 self.edging(p,i,b)
                 self.drilling(p,i,b)
+                self.grooving(p,i,b)
             self.verify()
         if calculate:
             self.page.get_by_text('Przelicz koszty',exact=False).click()

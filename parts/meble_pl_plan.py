@@ -4,6 +4,7 @@ import json
 import math
 import yaml
 from parts.precision import mm
+from parts.meble_pl_grooves import board_grooves
 from export import _load_model, _is_slide_visualisation
 from parts.materials import panel_axes, FACE_AXES, material_selections, grain_code
 
@@ -118,9 +119,8 @@ def make_plan(source):
                 plan['manual'].append(dict(board=board.name,operation=label,
                     direction=h.direction,position=[mm(a-b) for a,b in zip((h.x,h.y,h.z),board.pos)],
                     diameter=diameter,depth=depth,through=through,reason=reason))
-        for groove in board.grooves:
-            plan['manual'].append(dict(board=board.name,operation=groove['kind'],geometry=groove,
-                                      reason='Frez/wręg lub wycięcie: do ręcznego uzupełnienia; skrypt automatyzuje nawierty'))
+        item['grooves'], manual_grooves = board_grooves(board)
+        plan['manual'].extend(manual_grooves)
     if any(h.hole_type != 'dowel' and h.element == 1
            for board in boards for h in board.joint_holes):
         plan['manual_finishing'].append(
@@ -130,6 +130,11 @@ def make_plan(source):
             'Mocowania podnośników gazowych: meble.pl wykonuje wyłącznie znaczniki Ø3 × 3 mm. '
             'Właściwe nawierty Ø2,5 × 10 mm wykonać samodzielnie według modelu; '
             'pierwsze 3 mm otworu pozostaną poszerzone do Ø3 mm.')
+    if any(g['kind'] in ('ventilation_cut_guide', 'manual_cutout_guide')
+           for b in boards for g in b.grooves):
+        plan['manual_finishing'].append(
+            'Wręgi i płytkie nawierty obrysów są znacznikami: otwory wentylacyjne '
+            'i wycięcie przy mikrofalówce nadal trzeba wyciąć ręcznie.')
     return plan
 
 
@@ -140,6 +145,13 @@ def save_plan(plan, output):
              '## Płyty i formatki', '']
     for group in plan['groups']:
         lines.append(f"- {group['material'].get('name',group['material']['id'])}, {group['thickness']:g} mm: {len(group['boards'])} formatek")
+    lines += ['', '## Wręgowanie zlecane w formularzu', '']
+    for group in plan['groups']:
+        for board in group['boards']:
+            for groove in board.get('grooves', []):
+                lines.append('- ' + board['name'] + ': ' + json.dumps(groove, ensure_ascii=False))
+    if not any(b.get('grooves') for g in plan['groups'] for b in g['boards']):
+        lines.append('Brak wręgów obsługiwanych przez formularz.')
     lines += ['', '## Brakujące dane projektu (eksport produkcyjny nadal zablokowany)', '']
     for issue in plan['unresolved']:
         lines.append(f"- {issue['reason']} Elementy: {', '.join(issue['boards'])}.")
