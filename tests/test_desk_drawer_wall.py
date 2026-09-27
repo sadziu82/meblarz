@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from parts.desk_drawer_wall import load_desk_drawer_wall
-from export_meblepl import export
+from export import export
 
 
 YAML_PATH = Path(__file__).parent / 'fixtures' / 'desk_drawer_wall.yaml'

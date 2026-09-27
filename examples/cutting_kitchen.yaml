@@ -1,4 +1,7 @@
-shelf_front_setback: 10  # Default storage-shelf setback from the carcass front [mm].
+# Przykład: dwa materiały, półki cofnięte o 20 mm i klapa 75 stopni.
+# python cutting.py --vendor meble.pl examples/cutting_kitchen.yaml --dry-run
+# Model nadal ma dwa nierozstrzygnięte mocowania opisane w raporcie.
+shelf_front_setback: 20  # Default storage-shelf setback from the carcass front [mm].
 # Two-column kitchen tall unit. All dimensions are millimetres.
 kitchen_tall_unit:
   height: 2420

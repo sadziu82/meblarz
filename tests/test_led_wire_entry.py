@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 from parts.drawer import Board
 from parts.desk_drawer_wall import _add_led_groove, load_desk_drawer_wall
-from export_meblepl import export
+from export import export
 
 @pytest.mark.parametrize('edge,direction', [('rear','+y'),('left','-x'),('right','+x')])
 def test_wire_entry_axis_and_depth(edge,direction):

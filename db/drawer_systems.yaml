@@ -11,6 +11,11 @@ systems:
     side_length_deduction: 7
     side_thickness: 14
     minimum_depth_extra: 10
+    # Page 2: separate left/right rear-panel connectors supplied with each set.
+    # Their exact envelope is not dimensioned: these values are preview only.
+    rear_connector_preview:
+      flange_thickness: 1.2
+      screw_edge_margin: 5
     # Heights of purchased sides and cut rear boards are NOT interchangeable.
     variants:
       A: {side_height: 86, rear_height: 84, minimum_niche_height: 115, front_holes: [32.5, 64.5], rear_holes_from_top: [19, 51]}

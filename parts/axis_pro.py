@@ -33,6 +33,40 @@ def axis_spec(config):
     return spec, nl, variants
 
 
+def _add_rear_connector(boards, prefix, side, shell, rear, spec, nl):
+    """Simplified folded connector, catalogue p.2; never a cut-list part.
+
+    The bridge width follows the actual gap between the purchased side and
+    LW-87 back. The rear flange covers the existing catalogue screw axes.
+    Sheet thickness and flange outline are visual approximations only.
+    """
+    preview = spec['rear_connector_preview']
+    sheet = float(preview['flange_thickness'])
+    overlap = spec['rear_hole_inset'] + float(preview['screw_edge_margin'])
+    left = side == 'left'
+    inner_x = shell.pos[0] + shell.width if left else shell.pos[0]
+    rear_edge = rear.pos[0] if left else rear.pos[0] + rear.width
+    gap = abs(rear_edge-inner_x)
+    if gap <= 0:
+        raise ValueError('AXIS PRO rear connector requires clearance beside the back panel')
+    y, z = rear.pos[1], rear.pos[2]
+    colour = shell.color
+    name = f'{prefix}_rear_connector_{side}'
+    # Upright bridge closes the 6 mm gap; rear flange wraps behind the board.
+    shapes = (
+        ('bridge', min(inner_x, rear_edge), y, gap, rear.depth),
+        ('rear_flange', inner_x if left else rear_edge-overlap,
+         y+rear.depth, gap+overlap, sheet),
+        ('side_tab', inner_x-sheet if left else inner_x,
+         y, sheet, rear.depth),
+    )
+    for part, px, py, width, depth in shapes:
+        boards.append(Board(f'{name}_{part}', width, rear.height, depth,
+                            (px, py, z), colour, fabrication=False, travel=nl,
+                            motion_parent=rear.name,
+                            label='GTV AXIS PRO — mocowanie ścianki tylnej; uproszczony obrys'))
+
+
 def add_axis_drawer(boards, prefix, left, right, z, front_height, datum,
                     ceiling, spec, nl, variant, colour):
     """Datum is the top of the panel/rail below the drawer, not front bottom.
@@ -57,7 +91,7 @@ def add_axis_drawer(boards, prefix, left, right, z, front_height, datum,
                    (x + 37.5, 0, datum + 28), colour, travel=nl)
     rear = Board(f'{prefix}_rear', lw - spec['rear_width_deduction'],
                  v['rear_height'], 16, (x + 43.5, bottom.depth, datum + 23),
-                 colour, travel=nl)
+                 colour, travel=nl, covered_edges=('left', 'right'))
     boards.extend((front, bottom, rear))
     for side, carcass, sign in (('left', left, 1), ('right', right, -1)):
         face_x = x if sign == 1 else right.pos[0]
@@ -84,6 +118,7 @@ def add_axis_drawer(boards, prefix, left, right, z, front_height, datum,
                       fabrication=False, travel=nl,
                       label=f'GTV PB-AXISPRO-KPL{int(nl)}{variant}; uproszczony profil metalowy')
         boards.append(shell)
+        _add_rear_connector(boards, prefix, side, shell, rear, spec, nl)
         # Fixed mounting brackets, plus middle/inner telescoping members.
         for k, fraction in enumerate((0, .5, 1)):
             rx = face_x + k * 7 if sign == 1 else face_x - (k + 1) * 7

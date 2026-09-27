@@ -118,6 +118,7 @@ def _rename_drawer(boards: list[Board],
             fabrication=b.fabrication,
             yaw=b.yaw,
             opening=b.opening,
+            opening_angle=b.opening_angle,
             label=b.label,
             texture=b.texture,
             preview_shape=b.preview_shape,
@@ -497,6 +498,8 @@ def load_dresser(path: str) -> DrawerModel:
     # ─ Centre model ───────────────────────────────────────────────────────────
     all_boards = _center_model(all_boards)
 
+    from parts.materials import apply_finishes
+    apply_finishes(all_boards, cfg)
     return DrawerModel(
         boards=all_boards,
         max_travel=float(slide_cfg.get('travel_mm', nl_used)),

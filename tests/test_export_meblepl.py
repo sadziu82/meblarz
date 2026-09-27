@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 
-from export_meblepl import MEBLEPL_HEADER, export
+from export import MEBLEPL_HEADER, export
 
 
 YAML_PATH = Path(__file__).parent / 'fixtures' / 'dresser.yaml'

@@ -3,7 +3,7 @@ import math
 import pytest
 import yaml
 from parts.desk_drawer_wall import load_desk_drawer_wall
-from export_meblepl import export
+from export import export
 
 PROJECT = Path(__file__).parents[1] / 'projects/desk_drawer_wall.yaml'
 
@@ -56,7 +56,7 @@ def test_trial_fits_and_is_excluded_from_fabrication(tmp_path):
     assert 'monitor_preview' not in md.read_text()
     assert 'NIE jest eksportowany' in md.read_text()
     assert not any('monitor_preview' in p.name for p in dxfs.iterdir())
-    from export_meblepl import _drilling_rows
+    from export import _drilling_rows
     assert all(row[0] != 'prowadnica' for row in _drilling_rows(shelf))
 
 

@@ -10,6 +10,10 @@ carcass:
   placement: builtin_both   # 'freestanding' | 'builtin_left' | 'builtin_right' | 'builtin_both'
 
 material:
+  board: EGGER-H1318-ST10
+  edge_banding:
+    band_rear_edges: false
+    thickness: 0.8         # edge band thickness in mm; panel dimensions include edging
   thickness:        18   # płyta meblowa 18mm – wierzch, spód, boki korpusu
   back_thickness:    0   # tył otwarty (zasada 3: szafka z szufladami)
   drawer_thickness: 18   # płyta meblowa 18mm – elementy skrzynki szuflady

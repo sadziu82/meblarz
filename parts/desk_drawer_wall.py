@@ -1,5 +1,6 @@
 """Parametric desk wall with a drawer tower, storage and overhead shelves."""
 
+from parts.shelves import default_shelf_setback, shelf_geometry
 from pathlib import Path
 import math
 
@@ -217,6 +218,7 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
     with open(path) as source:
         root = yaml.safe_load(source)
     cfg = root['desk_drawer_wall']
+    default_setback = default_shelf_setback(root)
     material = root['material']
     thick = float(material['thickness'])
     back_thick = float(material.get('back_thickness', 3))
@@ -550,15 +552,13 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
     _add_led_groove(boards[-1], drawers.get('led_groove'))
     count = int(shelves.get('count', 0))
     rear_gap = back_thick if tower.get('back', {}).get('enabled', False) else 0
-    shelf_depth = (tower_d - rear_gap - float(shelves['front_setback'])
-                   if 'front_setback' in shelves else float(shelves.get('depth', tower_d)))
+    shelf_setback, shelf_depth = shelf_geometry(tower_d, shelves, default_setback, rear_gap)
     for index in range(count):
         shelf_z = section_h + thick + (index + 1) * (bridge_z - section_h - 2 * thick) / (count + 1)
         shelf_z = mm(shelf_z)
         shelf = Board(f'tower_shelf_{index}', width=tower_w - 2 * thick, height=thick,
                       depth=shelf_depth,
-                      pos=(tower_x + thick, tower_d - shelf_depth
-                           - (back_thick if tower.get('back', {}).get('enabled', False) else 0), shelf_z),
+                      pos=(tower_x + thick, shelf_setback, shelf_z),
                       color=_C_SHELF, movable=False)
         _add_led_groove(shelf, shelves.get('led_groove'))
         boards.append(shelf)
@@ -571,9 +571,9 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
             # Divide the remaining clear height in ratio 2:1, allowing for shelf thickness.
             z_shelf = bottom + float(secondary.get('fraction', 2 / 3)) * (ceiling - bottom - thick)
             z_shelf = mm(z_shelf)
-            setback = float(secondary['front_setback'])
+            setback, secondary_depth = shelf_geometry(tower_d, secondary, default_setback, rear_gap)
             shelf = Board(f'tower_secondary_shelf_{index}', tower_w - 2 * thick, thick,
-                          tower_d - rear_gap - setback, (tower_x + thick, setback, z_shelf),
+                          secondary_depth, (tower_x + thick, setback, z_shelf),
                           _C_SHELF, movable=False)
             _add_led_groove(shelf, secondary.get('led_groove', shelves.get('led_groove')))
             boards.append(shelf)
@@ -600,22 +600,24 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
                 Board(f'{prefix}_top', cabinet_w, thick, cabinet_d, (x, 0, cabinet_z + cabinet_h - thick), _C_MAIN, movable=False),
                 Board(f'{prefix}_bottom', cabinet_w, thick, cabinet_d, (x, 0, cabinet_z), _C_MAIN, movable=False),
             ])
+            cabinet_setback, cabinet_shelf_depth = shelf_geometry(
+                cabinet_d, {'front_setback': cabinets.get('front_setback', default_setback)}, default_setback)
             for shelf_index in range(int(cabinets.get('shelf_count', 0))):
                 shelf_z = cabinet_z + (shelf_index + 1) * (cabinet_h - 2 * thick) / (int(cabinets['shelf_count']) + 1)
                 shelf_z = mm(shelf_z)
                 boards.append(Board(f'{prefix}_shelf_{shelf_index}', cabinet_w - 2 * thick, thick,
-                                    cabinet_d, (x + thick, 0, shelf_z), _C_SHELF, movable=False))
+                                    cabinet_shelf_depth, (x + thick, cabinet_setback, shelf_z), _C_SHELF, movable=False))
             # Align cabinets with the same rear plane as the tower.
             for board in boards:
                 if board.name.startswith(prefix + '_'):
-                    board.pos = (board.pos[0], tower_d - cabinet_d, board.pos[2])
+                    board.pos = (board.pos[0], board.pos[1] + tower_d - cabinet_d, board.pos[2])
                     if board.name.endswith(('_top', '_bottom')):
                         board.width -= 2 * thick
                         board.pos = (board.pos[0] + thick, board.pos[1], board.pos[2])
 
     groups = overhead.get('shelf_groups', [])
     if overhead.get('middle_shelf', False):
-        groups = [{'count': 1, 'width': total_w, 'depth': tower_d - back_thick,
+        groups = [{'count': 1, 'width': total_w,
                    'bottom': mm(upper_z + (upper_height - thick) / 2)}]
         if 'middle_shelf_front_setback' in overhead:
             groups[0]['front_setback'] = float(overhead['middle_shelf_front_setback'])
@@ -624,9 +626,8 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
             # Shelves span bays, never pass through the full-height tower sides.
             start = float(group.get('left', 0))
             end = start + float(group.get('width', desk_w))
-            depth = float(group['depth'])
             shelf_z = float(group['bottom']) + shelf_index * float(group.get('spacing', 300))
-            if depth <= 0 or depth > min(left_depth, tower_d) or not upper_z <= shelf_z <= total_h - 2 * thick:
+            if not upper_z <= shelf_z <= total_h - 2 * thick:
                 raise ValueError('Overhead shelf exceeds side depth or furniture height')
             for bay, (left_side, right_side) in enumerate(upper_bays):
                 lo, hi = left_side.pos[0] + left_side.width, right_side.pos[0]
@@ -637,14 +638,9 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
                 has_back = (tower.get('back', {}).get('enabled', False) if is_tower
                             else desk_back_cfg.get('enabled', False))
                 back_gap = back_thick if has_back else 0
-                bay_depth = depth
-                if has_back:
-                    bay_depth = min(bay_depth, tower_d-back_gap)
-                if 'front_setback' in group:
-                    setback = float(group['front_setback'])
-                    bay_depth = tower_d - back_gap - setback
-                    if setback < 0 or not 0 < bay_depth <= min(left_side.depth, right_side.depth):
-                        raise ValueError('Overhead shelf front setback exceeds bay depth')
+                setback, bay_depth = shelf_geometry(tower_d, group, default_setback, back_gap)
+                if bay_depth > min(left_side.depth, right_side.depth):
+                    raise ValueError('Overhead shelf exceeds side depth')
                 suffix = '_tower' if is_tower else (f'_bay{bay}' if bay else '')
                 shelf = Board(f'overhead_shelf_{group_index}_{shelf_index}' + suffix,
                               hi - lo, thick, bay_depth,
@@ -694,6 +690,8 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
                 f"udźwig katalogowy {keyboard_slide['load_capacity_kg']} kg nie potwierdza tej szerokości.",
                 'Karta prowadnic: ' + keyboard_slide['source'],
             ])
+    from parts.materials import apply_finishes
+    apply_finishes(boards, root)
     return DrawerModel(boards=_center_model(boards), max_travel=float(slide_cfg.get('travel_mm', nl_used)),
                        slide_model=drawers['slides']['model'], slide_nl=nl_used,
                        joints=joints, drawer_count=drawer_count, notes=notes)

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from export_meblepl import (export, IncompleteMachiningError, write_meblepl_csv,
+from export import (export, IncompleteMachiningError, write_meblepl_csv,
                             write_drilling_sheet, write_dxf_files, _dxf_drills)
 from parts.kitchen_tall_unit import load_kitchen_tall_unit
 from parts.drawer import Board, Hole
@@ -196,7 +196,8 @@ def test_handles_follow_fronts_and_are_centred(tmp_path):
         assert _movable_group(preview) == _movable_group(front)
         if front.name.startswith('kitchen_drawer_'):
             assert (a.x + b.x) / 2 == front.pos[0] + front.width / 2
-            assert a.z == b.z == front.pos[2] + front.height / 2
+            from parts.precision import mm
+            assert a.z == b.z == front.pos[2] + mm(front.height / 2)
         elif front.opening.startswith('hinge_'):
             edge = front.pos[0] + front.width if front.opening == 'hinge_left' else front.pos[0]
             assert abs(a.x - edge) == 50
@@ -286,12 +287,45 @@ def test_dowels_between_confirmats_only_above_200_mm(depth, expected):
 def test_incomplete_model_blocks_every_manufacturing_writer(tmp_path):
     model, boards, _ = load(tmp_path)
     assert {i['operation'] for i in model.machining_issues} == {
-        'axis_bottom_fixing', 'gas_lift_mount', 'fridge_slider_mount', 'plinth_clip_mount'}
+        'fridge_slider_mount', 'plinth_clip_mount'}
     assert all(name in boards for issue in model.machining_issues for name in issue['boards'])
     target = tmp_path / 'must_not_be_written'
     for write in (lambda: write_meblepl_csv(model, target),
                   lambda: write_drilling_sheet(model, target, 'test'),
                   lambda: write_dxf_files(model, target)):
-        with pytest.raises(IncompleteMachiningError, match='AXIS PRO'):
+        with pytest.raises(IncompleteMachiningError, match='Samsung'):
             write()
         assert not target.exists()
+
+
+@pytest.mark.parametrize('nl', [450, 600])
+@pytest.mark.parametrize('variants', [['D', 'B', 'A'], ['C', 'B', 'A']])
+def test_axis_rear_connectors_bridge_gap_and_cover_catalogue_holes(tmp_path, nl, variants):
+    from export import _is_slide_visualisation
+    model, boards, _ = load(tmp_path, lambda c: c['right_column']['drawers']['axis_pro'].update(
+        nl=nl, variants=variants))
+    for i in range(3):
+        prefix = f'kitchen_drawer_{i}'
+        rear = boards[f'{prefix}_rear']
+        assert not {'left', 'right'} & rear.edgebands.keys()
+        for side in ('left', 'right'):
+            shell = boards[f'{prefix}_axis_pro_{side}']
+            bridge = boards[f'{prefix}_rear_connector_{side}_bridge']
+            flange = boards[f'{prefix}_rear_connector_{side}_rear_flange']
+            assert bridge.width == 6
+            assert bridge.pos[1:] == rear.pos[1:]
+            assert (bridge.depth, bridge.height) == (rear.depth, rear.height)
+            if side == 'left':
+                assert bridge.pos[0] == pytest.approx(shell.pos[0]+shell.width)
+                assert bridge.pos[0]+bridge.width == pytest.approx(rear.pos[0])
+            else:
+                assert bridge.pos[0] == pytest.approx(rear.pos[0]+rear.width)
+                assert bridge.pos[0]+bridge.width == pytest.approx(shell.pos[0])
+            assert flange.pos[1] == rear.pos[1]+rear.depth
+            holes = [h for h in rear.holes if flange.pos[0] < h.x < flange.pos[0]+flange.width]
+            assert len(holes) == len(rear.holes)//2
+            for part in (bridge, flange):
+                assert part.motion_parent == rear.name and part.travel == nl
+                assert _movable_group(part) == prefix
+                assert _is_slide_visualisation(part)
+                assert not part.holes and not part.joint_holes

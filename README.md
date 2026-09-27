@@ -120,14 +120,24 @@ Furniture fridge doors have independent cup hinges in addition to sliding
 couplers. `fridge.fronts.sliding_connectors` positions preview centres at
 `width_fraction_from_hinge: 0.75` and `height_fractions: [0.25, 0.75]`.
 The horizontal 90 × 38 mm markers mirror automatically for right hinges.
-These proportions are a user-selected illustration, not Samsung mounting data. Lift-up hinges attach to the top board; their -1 mm overlay adjustment
-retains the 3 mm top reveal. Unverified gas-lift holes have been removed; the
-selected lift's template and force remain to be specified.
+These proportions are a user-selected illustration, not Samsung mounting data.
+Lift-up hinges attach to the top board; their -1 mm overlay adjustment retains
+the 3 mm top reveal. `gas_lifts.enabled` adds two GTV NEO struts at the sides of
+the flap. Their fixing holes follow the [GTV NEO technical card, p. 2](https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PD-GNEO_update%2007.10.2020.pdf):
+`gas_lifts.opening_angle` selects 75° (this project: H=237, L=73 mm) or 90°
+(H=217, L=54 mm). Both schemes use C=24 mm, a 19.5 mm side setback, and two
+screw holes spaced 32 mm **vertically** on each side and on the closed flap.
+The Ø2.5 × 10 mm pilot for the supplied 3.5 × 16 mm screws is a
+project choice. Strut ball-joint centres in the preview remain schematic; their
+model now shows rounded 48 mm mounting plates, screw heads, projecting ball
+studs, a Ø12 barrel with 31 mm end fittings, and a Ø4 sliding rod. The exact
+joint mechanism and the selected 80 N force must be confirmed against the
+actual front. `gas_lifts.model` selects the library entry.
 
 `handles.model` selects GTV UA-00-337160-20M from the existing handle library:
 160 mm fixing centres, 180 mm overall length, Ø5 through bores in this project.
-Drawer handles are exactly centred (a 160.5 mm high front has its centre at
-80.25 mm; do not independently round and lose centring). Door handles are vertical
+Drawer handles share one centre rounded to 0.1 mm (a 160.5 mm high front
+has its mathematical centre at 80.25 mm; production bores use 80.3 mm). Door handles are vertical
 on the free edge: lower-front top corner, upper-front bottom corner. The flap
 handle is horizontal at its bottom edge. `door_edge_offset`, `door_end_offset`
 (nearest fixing hole) and `lift_bottom_offset` default to 50 mm. These are design
@@ -146,9 +156,12 @@ Missing machining templates are structured `DrawerModel.machining_issues`.
 Preview remains available and shows a status message with the missing operations.
 All manufacturing writers (CSV, drilling sheet and DXF) reject such a model before
 writing files; there is no override switch. The current kitchen is therefore
-**not yet exportable for production**: AXIS bottom-to-metal-side fixings, flap
-lifts, Samsung sliding couplers, and plinth-clip fixing still need
-verified mounting templates. Filling in those library templates must resolve the
+**not yet exportable for production**: Samsung sliding couplers and plinth-clip
+fixing still need verified mounting templates. AXIS bottom-to-metal-side screws
+are an agreed assembly operation: fasten from below through the holes in the
+metal sides (GTV instructions p.9, drawer assembly step 4). No CNC pilot pattern
+is generated for these screws; the operation is listed in the report and does
+not block production export. Filling in those library templates must resolve the
 issues; removing an error flag without adding the missing machining is not a fix.
 
 Sources: [GTV AXIS PRO, pp.6–8](https://assets.gtv.com.pl/assets/attachments/karta_techniczna/Axis_Pro_karta%20techniczna_3.pdf),
@@ -274,7 +287,7 @@ and 2 mm between paired doors. Overlays are derived from carcass thickness:
 The desk project now has five 596 × 169 mm fronts spanning Z=3 to Z=860 mm.
 The kitchen has 596 mm drawer fronts and two 297 mm upper doors.
 Appliance installation requirements take precedence at appliance boundaries.
-Front divisions use 0.5 mm increments, distributing any remainder without
+Front divisions use 0.1 mm increments, distributing any remainder without
 changing the total height or gaps. Handle holes remain centred.
 `front.mount: overlay` enables these rules for the standalone drawer and dresser;
 their existing inset examples retain their explicit recess and finger gaps.
@@ -375,12 +388,12 @@ drawer generator; selecting it gives an explicit error instead of invalid drilli
 Source URLs are stored with each product in the libraries.
 
 ```bash
-venv/bin/python export_meblepl.py projects/dresser.yaml
+venv/bin/python export.py --vendor meble.pl projects/dresser.yaml
 ```
 
 The command creates two files in `exports/`:
 
-- `<model>-meblepl.csv` — a PRO100-compatible cut list for **Wczytaj listę formatek z CSV** in Meble.pl. The export leaves edging and grain direction unset, so select them on the site.
+- `<model>-meblepl.csv` — a PRO100-compatible cut list for **Wczytaj listę formatek z CSV** in Meble.pl. The export includes automatic edging and grain direction in the installed panel orientation.
 - `<model>-wiercenia.md` — dimensions and every drilling position for each board. Meble.pl's CSV import contains only cut-list data; its online drilling options are limited to built-in templates. Use this file when arranging custom drilling with their CNC service.
 - `<model>-dxf/` — one AutoCAD R12 DXF per drilled board face. Each file contains the board outline and drilling circles on layers that state the diameter and depth; it can be sent to CNC for custom drilling.
 
@@ -547,3 +560,234 @@ width is derived from the carcass, and reveals/gaps use the common furniture
 rules in `parts/front_rules.py`, not per-appliance YAML settings.
 Drawer `front_heights: [300, 250, null]` automatically sizes the top drawer front
 to preserve alignment with the freezer furniture front (currently 160.5 mm).
+
+### Płyta i automatyczne oklejanie w podglądzie
+
+Każdy generator automatycznie wylicza krawędzie do oklejenia; nie trzeba
+wpisywać listy formatek. `projects/drawer.yaml` wybiera płytę
+`material.board: EGGER-H1318-ST10` z biblioteki `db/materials.yaml`.
+Podgląd używa lokalnej próbki dekoru; cienkie plecy/dna HDF i okucia zachowują
+swój wygląd. Skala próbki jest orientacyjna. Kierunek słojów odpowiada regułom rozkroju.
+
+Domyślne zasady:
+
+- Oklejane są odsłonięte wąskie krawędzie płyt. Pełny styk z inną płytą
+  ukrywa krawędź; częściowe zasłonięcie pozostawia całą krawędź do oklejenia.
+  Uwzględniana jest suma powierzchni styku kilku płyt.
+- Fronty szuflad i drzwiczki są oklejane dookoła. Ruchome elementy nie
+  zasłaniają na stałe korpusu, a korpus nie zasłania otwartej szuflady.
+- Nie oklejamy krawędzi stykających się z podłogą (Z=0). Samodzielna szuflada
+  nie ma określonego położenia względem podłogi, więc ten wyjątek jej nie dotyczy.
+- Tylne krawędzie (skierowane w +Y) nie są domyślnie oklejane. Parametr
+  `material.edge_banding.band_rear_edges: true` włącza oklejanie tych, które nie są
+  zasłonięte stykiem z inną płytą. Krawędzie przy podłodze nadal są pomijane.
+- Płyty o grubości do 6 mm (np. HDF) i wizualizacje okuć są pomijane.
+
+```yaml
+material:
+  board: EGGER-H1318-ST10
+  thickness: 18
+  bottom_thickness: 18
+  edge_banding:
+    thickness: 0.8
+    # Domyślne ustawienia — nie trzeba ich wpisywać:
+    automatic: true
+    band_rear_edges: false        # true: oklejaj odsłonięte tylne krawędzie
+    floor_edges: false
+    # Opcjonalne wyjątki zastępują wynik automatu dla danej formatki:
+    # boards:
+    #   shelf: [front]
+    #   hidden_panel: []
+```
+
+Nazwy krawędzi odnoszą się do układu mebla: `left/right` = −X/+X,
+`front/rear` = −Y/+Y, `bottom/top` = −Z/+Z. Wyjątki mogą używać wzorców nazw,
+np. `drawer_*_front`; późniejszy wpis zastępuje wcześniejszy. Nieznana nazwa
+lub szeroka powierzchnia zamiast krawędzi powoduje błąd.
+
+Automat analizuje geometrię płyt, nie kamerę ani pomieszczenie. Ściana pokoju
+nie jest domyślnie przeszkodą. Kontakty liczone są na prostokątnych obrysach;
+płyty obrócone lub zaokrąglone nie są używane jako przeszkody zasłaniające inne
+płyty. Frezy nie zmieniają obszaru styku. Dla nietypowych połączeń można podać
+wyjątek. Zaokrąglone frontowe krawędzie blatu mają oznaczenie po łuku.
+
+Wymiary formatek są końcowe, razem z obrzeżem; automat nie powiększa modelu.
+Turkusowy obrys oznacza oklejoną krawędź. **E** włącza/wyłącza oznaczenia,
+także ze stdin przez SSH; **Ctrl+R** ponownie wczytuje YAML.
+Eksport CSV zapisuje liczbę oklejonych krawędzi (`puste`/`-`/`=`), a arkusz
+wierceń ich nazwy, grubości i płytę. CSV PRO100 nie rozróżnia, która z dwóch
+równoległych krawędzi ma pojedyncze obrzeże; po imporcie trzeba sprawdzić
+stronę oklejenia i wybrać dekor/grubość obrzeża w konfiguratorze.
+
+### Domyślne cofnięcie półek
+
+Na głównym poziomie YAML można podać `shelf_front_setback: 10` (mm).
+Domyślne 10 mm mierzymy od przedniej płaszczyzny korpusu, nie od zewnętrznej
+powierzchni nakładanego frontu. Półka jest krótsza od przodu; jej tylna krawędź
+pozostaje na miejscu, z uwzględnieniem pleców. Połączenia i frezy liczą się
+już dla zmienionej geometrii.
+
+Reguła dotyczy półek wewnętrznych w słupku kuchennym, wieży biurkowej,
+nadbudówce i opcjonalnych szafkach nad biurkiem. Lokalne `front_setback`
+lub jawna `depth` półki mają pierwszeństwo, więc istniejące cofnięcia 20/70 mm
+pozostają zachowane. W słupku można nadpisać wartość przez
+`kitchen_tall_unit.right_column.upper_cabinet.front_setback`; w szafkach nad
+biurkiem przez `desk_drawer_wall.overhead.cabinets.front_setback`.
+Ustawienie 0 oznacza półkę zlicowaną z korpusem. Nie zmieniamy dna, wieńców,
+podpór urządzeń, blatu, podstawki monitorów ani wysuwanej półki klawiatury.
+
+### Mocowania tylnej ścianki AXIS PRO
+
+Podgląd zawiera lewe i prawe mocowanie tylnej płyty dla wariantów A/B/C/D,
+zgodnie ze składem zestawu na s. 2 karty GTV. Tył `LW−87` pozostaje węższy od
+dna `LW−75` o 12 mm: po 6 mm przy bokach zajmują łączniki. Wymiary rozkroju
+oraz nawierty Ø2 × 12 mm, 9,5 mm od bocznych krawędzi tyłu, pozostają zgodne
+z kartą (s. 6–8).
+
+Łączniki są kupowanym okuciem, nie formatkami. Mostek, tylne skrzydełko i
+boczny zaczep mają uproszczony obrys; grubość blachy i szerokość skrzydełka
+w `db/drawer_systems.yaml/rear_connector_preview` są wyłącznie wizualizacją,
+nie danymi produkcyjnymi. Zakryte nimi boczne krawędzie tyłu nie są
+automatycznie oklejane.
+
+Źródło: [GTV AXIS PRO — karta techniczna](https://assets.gtv.com.pl/assets/attachments/karta_techniczna/Axis_Pro_karta%20techniczna_3.pdf).
+
+### Automatyczne wypełnienie rozkroju meble.pl
+
+[Pełny przewodnik: opcje CLI, YAML, przykłady i rozwiązywanie błędów](docs/cutting_and_materials.md).
+
+```bash
+source venv/bin/activate
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/kitchen_tall_unit.yaml
+```
+
+Skrypt otwiera osobne okno Chromium na pełnym ekranie, wybiera materiały,
+importuje formatki, ustawia obrzeża i obsługiwane nawierty, sprawdza zapisane
+wartości oraz przelicza koszt. Nie dodaje zlecenia do koszyka i nie zamawia.
+Pozostawia przeglądarkę do sprawdzenia; Ctrl+C kończy skrypt i zamyka jego okno.
+Zmiana układu strony, brak grubości/dekoru lub odrzucenie wymiaru przerywa pracę
+z błędem, zrzutem ekranu i zachowanym formularzem — bez zamiany na podobny wariant.
+
+**Każda grubość wymaga jawnego materiału w YAML.** Projekt kuchenny ma już
+wybrane oba materiały:
+
+```yaml
+kitchen_tall_unit:
+  material:
+    thickness: 18
+    boards_by_thickness:
+      18: EGGER-U999-ST19
+      16: KRONOSPAN-U0164-ST9
+```
+
+Dla innych generatorów `material` jest na głównym poziomie YAML.
+Brak wyboru dla którejkolwiek użytej grubości przerywa pracę przed otwarciem
+przeglądarki. Nie zakładamy tego samego dekoru dla wszystkich grubości.
+
+Można wskazać identyfikator z `db/materials.yaml`, np.
+`18: EGGER-H1318-ST10`. Dotychczasowe `material.board` przypisuje płytę tylko
+do `material.thickness` (domyślnie 18), nigdy do pozostałych grubości.
+Jawne przypisania mogą również zawierać `texture` i `texture_size_mm` do
+podglądu. Dostępność danej grubości sprawdzana jest osobno na stronie.
+
+Przydatne opcje:
+
+```bash
+python cutting.py --vendor meble.pl projects/drawer.yaml --dry-run
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --no-calculate
+```
+
+`--dry-run` zapisuje lokalny plan i raport bez sieci/przeglądarki.
+`--output-dir KATALOG` wybiera miejsce zapisu; domyślnie powstaje nowy katalog
+`exports/NAZWA-meblepl-DATA-CZAS/`. `--close` zamyka okno po zakończeniu;
+`--headless` uruchamia bez GUI i również zamyka przeglądarkę.
+
+Porównanie zapisanego rozkroju z aktualnym YAML-em (bez zmiany danych na stronie):
+
+```bash
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --verify https://www.meble.pl/rozkroj,r20145925
+```
+
+Odtworzenie wszystkich formatek z YAML-a na podstawie istniejącego rozkroju:
+
+```bash
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --recreate https://www.meble.pl/rozkroj,r20145925
+```
+
+`--recreate` zastępuje listy formatek wraz z obróbką i obrzeżami, usuwa zbędne
+płyty i dodaje wymagane materiały. Przed zmianą zapisuje kopię HTML, pól formularza,
+adresu i zrzut ekranu (`przed-odtworzeniem*`). Po przeliczeniu ponownie odczytuje
+zapisany rozkrój i porównuje go z planem.
+**Meble.pl podczas standardowego przeliczania nadaje nowy numer rozkroju** —
+nie można obiecać zachowania wejściowego URL-a. Skrypt wypisuje wynikowy adres,
+a `odtworzenie.json` zawiera adres źródłowy, wynikowy i informację, czy numer
+pozostał ten sam. Ta opcja nie łączy się z `--verify` ani `--no-calculate`.
+`--recreate URL --dry-run` sprawdza tylko lokalny projekt, bez zmian w serwisie.
+
+`--verify` sprawdza materiał i grubość, nazwy i liczbę formatek, wymiary,
+ilości, ustawienie słojów, oklejane krawędzie, grubość/dekor obrzeża oraz
+nawierty (strona, współrzędne, średnica, głębokość, także brakujące i nadmiarowe).
+Zapisuje `weryfikacja.md` i odczyt formularza `odczyt.json`. Różnice dają kod
+wyjścia 1; zgodność w sprawdzanym zakresie — 0. Frezy i pozostałe operacje
+z `raport.md` nadal wymagają osobnej kontroli; zgodność szkicu nie oznacza
+kompletności dokumentacji produkcyjnej. Grupy materiałów są porównywane
+w kolejności z planu, formatki wewnątrz grup — po nazwach.
+
+Pasek postępu nawiertów odświeża się po każdym zapisanym otworze; w logu
+bez terminala każdy krok zajmuje osobny wiersz. Ctrl+C zgłasza zakończenie
+pracy po bieżącej operacji przeglądarki; kolejne Ctrl+C nie przerywa sprzątania.
+
+W katalogu znajdują się `plan.json`, `raport.md`, sprawdzone pola formularza,
+wynik wyceny i zrzut ekranu. Nawierty mapowane są na układ każdej formatki,
+z uwzględnieniem wiercenia z przodu/tyłu i w czołach. Średnice/głębokości nie
+są zaokrąglane do dostępnych zamienników. Uzgodnione wyjątki dla rozkroju:
+konfirmaty w krawędziach mają piloty Ø4 × 35 mm, a na płaszczyznach
+otwory przelotowe Ø5 mm; prowadnice zaznaczenia
+Ø3 × 3 mm, a pogłębienia pod łby konfirmatów wykonuje użytkownik samodzielnie
+(skrypt ich nie zleca). Wymiary okuć w modelu pozostają bez zmian.
+Wręgi/frezy oraz nieobsługiwane
+nawierty są wyszczególnione do ręcznego uzupełnienia/wykonania osobno.
+Zaokrąglone formatki powodują błąd — skrypt nie zastępuje ich prostokątem.
+
+To **szkic częściowego rozkroju do przeglądu**, zwłaszcza gdy model zgłasza
+brak szablonów mocowań. Takie braki są wymienione przed wypełnianiem i w raporcie.
+Dotychczasowa blokada eksportu produkcyjnego CSV/DXF nie jest zdejmowana.
+Wycena dotyczy tylko obróbki faktycznie wprowadzonej do formularza.
+
+### Orientacja formatek i słojów
+
+Formatki zachowują orientację z mebla, bez sortowania boków od najdłuższego:
+płyty poziome mają w rozkroju szerokość X i głębokość Y; fronty oraz plecy
+szerokość X i wysokość Z; boki głębokość Y i wysokość Z.
+Domyślne słoje biegną wzdłuż szerokości płyt poziomych i frontów (także pleców),
+a na bokach i pionowych przegrodach — pionowo. Te same reguły stosują podgląd
+tekstury, CSV, skrypt meble.pl i weryfikacja. Współrzędne nawiertów, strony A/B
+oraz oklejane krawędzie są przeliczane do tej orientacji.
+
+Na oklejonych krawędziach tekstura obrzeża ma słoje wzdłuż krawędzi,
+niezależnie od słojów na płaszczyźnie płyty. Na zaokrągleniach słoje biegną
+wzdłuż łuku. Turkusowy obrys nadal oznacza krawędzie do oklejenia.
+
+Wymiary produkcyjne i współrzędne obróbki zapisujemy z rozdzielczością 0,1 mm.
+Zaokrąglanie jest dziesiętne: 80,25 → 80,3 mm; obliczenia pośrednie zachowują
+pełną precyzję. Pozycje nawiertów zaokrąglamy względem lokalnego początku
+formatki, przed wysłaniem do meble.pl. Plan JSON, CSV, dokumentacja i podgląd
+korzystają z tych samych wymiarów. Rozdzielczość nie oznacza tolerancji wykonania.
+
+Nazwy płyt w katalogu i formularzu meble.pl mogą się różnić. Dla potwierdzonych
+wariantów biblioteka może podać `meble_pl.product_codes` według grubości.
+Wtedy wybór i `--verify` wymagają zgodności dokładnego kodu produktu oraz
+grubości. Kronospan U0164 ST9 16 mm ma kod `P16ST41MEB11.U0164.ST9.KRO`,
+mimo nazwy formularza „0164 ST9 2800x2070 16 mm (u963)”.
+
+Jeżeli formularz meble.pl oznacza materiał jako bezkierunkowy (`plyta_sloje=0`),
+skrypt i `--verify` pomijają wybór kierunku słojów, którego formularz wtedy
+nie udostępnia. Dotyczy to m.in. Kronospan U0164 ST9 16 mm. Dla pozostałych
+materiałów nadal obowiązuje kontrola kierunku zgodnego z orientacją formatki.
+
+Skrypty `cutting.py` (formularz przeglądarkowy) i `export.py` (pliki CSV, DXF
+i dokumentacja) wymagają `--vendor meble.pl`. Obecnie jest to jedyny
+obsługiwany dostawca; brak opcji lub inna nazwa kończy działanie przed
+wczytaniem projektu i uruchomieniem przeglądarki.

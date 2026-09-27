@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 
 import yaml
+from parts.precision import mm
+from parts.materials import csv_edging, panel_axes, grain_code
 
 from parts.drawer import Board, DrawerModel, Hole, JointHole, load_drawer
 from parts.desk_drawer_wall import load_desk_drawer_wall
@@ -57,15 +59,14 @@ def _is_slide_visualisation(board: Board) -> bool:
 
 def _cut_dimensions(board: Board) -> tuple[float, float, float]:
     """Return the two face dimensions and thickness for a rectangular board."""
-    dimensions = sorted((board.width, board.height, board.depth))
-    thickness = dimensions[0]
-    width, height = dimensions[2], dimensions[1]
-    return width, height, thickness
+    sizes = (board.width, board.depth, board.height)
+    return tuple(sizes[axis] for axis in panel_axes(board))
 
 
 def _number(value: float) -> str:
-    """Write integer millimetres without a redundant decimal separator."""
-    return str(int(value)) if value == int(value) else f'{value:.2f}'.rstrip('0').rstrip('.')
+    """Production values at 0.1 mm resolution, without redundant zeroes."""
+    value = mm(value)
+    return str(int(value)) if value == int(value) else f'{value:.1f}'
 
 
 def write_meblepl_csv(model: DrawerModel, path: Path) -> None:
@@ -77,15 +78,16 @@ def write_meblepl_csv(model: DrawerModel, path: Path) -> None:
         writer.writerow(MEBLEPL_HEADER)
         for board in boards:
             width, height, thickness = _cut_dimensions(board)
+            edge_width, edge_height = csv_edging(board)
             writer.writerow([
                 board.name,
                 _number(width),
-                '-',  # edging is intentionally unset: choose it in Meble.pl
+                edge_width,
                 _number(height),
-                '-',
+                edge_height,
                 _number(thickness),
                 '1',
-                '0',  # no grain direction was specified in the YAML
+                str(grain_code(board)),
             ])
 
 
@@ -154,7 +156,7 @@ def write_drilling_sheet(model: DrawerModel, path: Path, source_name: str) -> No
         f'Prowadnice: **{model.slide_model}**, NL = **{model.slide_nl} mm**.',
         '',
     ]
-    for note in model.notes:
+    for note in (*model.notes, *model.assembly_operations):
         lines += [note, '']
     for board in boards:
         width, height, thickness = _cut_dimensions(board)
@@ -165,6 +167,14 @@ def write_drilling_sheet(model: DrawerModel, path: Path, source_name: str) -> No
             '(szerokość × wysokość × grubość).',
             '',
         ]
+        if board.material_id:
+            lines += [f'Materiał: {board.material_id}.', '']
+        if board.edgebands:
+            labels = {'left': 'lewa', 'right': 'prawa', 'front': 'przednia',
+                      'rear': 'tylna', 'top': 'górna', 'bottom': 'dolna'}
+            edges = ', '.join(f'{labels[face]} ({_number(value)} mm)'
+                              for face, value in board.edgebands.items())
+            lines += [f'Oklejone krawędzie: {edges}. Wymiary zawierają obrzeża.', '']
         if board.name.endswith('_back') and board.color[:3] == (0.95, 0.95, 0.95):
             lines += ['Materiał: HDF biały, grubość ' + _number(thickness) + ' mm.', '']
         if board.name.endswith('bottom') and thickness == 3:
@@ -472,12 +482,14 @@ def export(path: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     return csv_path, drilling_path, dxf_dir
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--vendor', required=True, choices=['meble.pl'],
+                        help='dostawca rozkroju (wymagany)')
     parser.add_argument('yaml_path', type=Path, help='model YAML')
     parser.add_argument('--output-dir', type=Path, default=Path('exports'),
                         help='directory for generated files (default: exports)')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         csv_path, drilling_path, dxf_dir = export(args.yaml_path, args.output_dir)
     except ValueError as exc:

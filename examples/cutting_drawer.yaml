@@ -1,3 +1,5 @@
+# Gotowy przykład: automatyczne obrzeża 0.8 mm i kierunek słojów.
+# python cutting.py --vendor meble.pl examples/cutting_drawer.yaml --dry-run
 # Szuflada wewnętrzna bez uchwytu z prowadnicami kulkowymi
 # Wymiary wnęki (klient podaje):
 niche:

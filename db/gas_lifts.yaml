@@ -1,0 +1,26 @@
+gas_lifts:
+  GTV-PD-GNEO12-80-60:
+    source: https://assets.gtv.com.pl/assets/attachments/karta_techniczna/PD-GNEO_update%2007.10.2020.pdf
+    mounting: overlay_lift_up
+    force_n: 80
+    # GTV NEO Ø12, technical card p.2, overlay-hinge rows.
+    mounting_options:
+      75: {h: 237, l: 73, c: 24, w: 275}
+      90: {h: 217, l: 54, c: 24, w: 275}
+    # H: top underside to upper carcass fixing; L: to front mounting centre.
+    # C: front mounting centre from inner side plane; W: minimum cabinet height.
+    side_front_setback: 19.5
+    fixing_spacing: 32
+    # Shape of PD-GNEO12 on the technical card, p.2. Plate width is schematic.
+    plate_length: 48
+    plate_width: 16
+    side_projection: 26
+    front_projection: 16
+    barrel_diameter: 12
+    rod_diameter: 4
+    barrel_length: 115
+    socket_length: 31
+    supplied_screws: '3.5 x 16'
+    # Project choice for the supplied wood screws, not a GTV drill specification.
+    pilot_diameter: 2.5
+    pilot_depth: 10

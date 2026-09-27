@@ -1,3 +1,5 @@
+# Przykład: obrzeże 2 mm, tył dozwolony, wyjątek dla jednej formatki.
+# python cutting.py --vendor meble.pl examples/cutting_drawer_edges.yaml --dry-run
 # Szuflada wewnętrzna bez uchwytu z prowadnicami kulkowymi
 # Wymiary wnęki (klient podaje):
 niche:
@@ -14,8 +16,10 @@ slides:
 material:
   board: EGGER-H1318-ST10
   edge_banding:
-    band_rear_edges: false
-    thickness: 0.8         # edge band thickness in mm; panel dimensions include edging
+    band_rear_edges: true
+    thickness: 2           # obrzeże 2 mm; wymiary końcowe z obrzeżem
+    boards:
+      rear: []            # jawny wyjątek: tył szuflady bez oklejania
   thickness: 18         # płyta meblowa 18mm
   bottom_thickness: 18  # dno skrzynki płyta meblowa 18mm
 

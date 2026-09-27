@@ -25,7 +25,7 @@ def test_dresser_overlay_reveals(tmp_path):
     assert fronts[0].pos[2] == cfg['plinth']['height'] + 3
     assert fronts[-1].pos[2] + fronts[-1].height == cfg['carcass']['height'] - 3
     for a, b in zip(fronts, fronts[1:]):
-        assert b.pos[2] - a.pos[2] - a.height == 3
+        assert b.pos[2] - a.pos[2] - a.height == pytest.approx(3)
 
 
 def test_standalone_overlay_dimensions(tmp_path):
@@ -48,9 +48,9 @@ def test_double_doors_have_two_mm_centre_gap():
     assert b['kitchen_right_side'].pos[0] + 18 - right.pos[0] - right.width == 2
 
 
-def test_half_mm_distribution_preserves_total():
+def test_tenth_mm_distribution_preserves_total():
     heights = split_front_heights(821, 5)
-    assert sum(heights) == 821
-    assert max(heights) - min(heights) <= 0.5
+    assert sum(heights) == pytest.approx(821)
+    assert max(heights) - min(heights) <= 0.1 + 1e-9
     with pytest.raises(ValueError):
-        split_front_heights(821.2, 5)
+        split_front_heights(821.25, 5)

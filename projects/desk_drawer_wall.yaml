@@ -1,3 +1,4 @@
+shelf_front_setback: 10  # Default storage-shelf setback from the carcass front [mm].
 # Desk wall with a drawer tower. All dimensions are millimetres.
 desk_drawer_wall:
   lighting_controls:

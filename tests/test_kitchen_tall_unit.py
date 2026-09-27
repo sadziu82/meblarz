@@ -3,14 +3,80 @@ from pathlib import Path
 import yaml
 import pytest
 
-from export_meblepl import export, IncompleteMachiningError, _dxf_file, _drilling_rows, _dxf_drills
+from export import export, IncompleteMachiningError, _dxf_file, _drilling_rows, _dxf_drills
 from parts.kitchen_tall_unit import load_kitchen_tall_unit
+from parts.gas_lift import gas_lift_anchors, lift_flap_point
 from parts.kitchen_ventilation import (guide_rectangles, guide_marker_points,
                                        routable_guide_rectangles)
 from viewer import _movable_group
 
 
 PROJECT = Path(__file__).parents[1] / 'projects/kitchen_tall_unit.yaml'
+
+
+def test_gas_lifts_follow_flap_on_both_sides(tmp_path):
+    model = load_kitchen_tall_unit(str(PROJECT))
+    boards = {b.name: b for b in model.boards}
+    assert {lift.side_board for lift in model.gas_lifts} == {
+        'kitchen_left_side', 'kitchen_left_right_side'}
+    door = boards['fridge_top_lift_door']
+    assert door.opening_angle == 75
+    for lift in model.gas_lifts:
+        closed_fixed, closed_moving = gas_lift_anchors(lift, boards, 0)
+        opened_fixed, opened_moving = gas_lift_anchors(lift, boards, 1)
+        assert closed_fixed == opened_fixed
+        assert closed_moving[0] == opened_moving[0]
+        assert closed_moving[1] > opened_moving[1]
+        assert opened_moving[2] > closed_moving[2]
+        assert closed_moving[0] in (door.pos[0] + 40, door.pos[0] + 706)
+        assert opened_moving == lift_flap_point(door, lift.door_anchor, 1)
+    assert not any(issue['operation'] == 'gas_lift_mount' for issue in model.machining_issues)
+    top = boards['kitchen_top']
+    for name, direction in (('kitchen_left_side', '+x'), ('kitchen_left_right_side', '-x')):
+        side = boards[name]
+        holes = [h for h in side.holes if h.kind == 'gas_lift_mount']
+        assert len(holes) == 2
+        assert {(h.y - side.pos[1], top.pos[2] - h.z) for h in holes} == {
+            (19.5, 237), (19.5, 269)}
+        assert all((h.direction, h.diameter, h.depth, h.through) ==
+                   (direction, 2.5, 10, False) for h in holes)
+    front_holes = [h for h in door.holes if h.kind == 'gas_lift_mount']
+    assert len(front_holes) == 4
+    assert {(h.x - door.pos[0], top.pos[2] - h.z) for h in front_holes} == {
+        (40, 57), (40, 89), (706, 57), (706, 89)}
+    assert all((h.y, h.direction, h.diameter, h.depth) ==
+               (door.pos[1] + door.depth, '+y', 2.5, 10) for h in front_holes)
+    for name in ('kitchen_left_side', 'kitchen_left_right_side', 'fridge_top_lift_door'):
+        rows = [row for row in _drilling_rows(boards[name])
+                if row[0] == 'mocowanie podnośnika']
+        assert len(rows) == (4 if name == 'fridge_top_lift_door' else 2)
+        assert all(row[-1] == 'Ø2.5, głębokość 10 mm' for row in rows)
+
+    config = yaml.safe_load(PROJECT.read_text())
+    config['kitchen_tall_unit']['gas_lifts']['enabled'] = False
+    path = tmp_path / 'no_gas_lifts.yaml'
+    path.write_text(yaml.safe_dump(config))
+    disabled = load_kitchen_tall_unit(str(path))
+    assert not disabled.gas_lifts
+    assert not any(h.kind == 'gas_lift_mount' for b in disabled.boards for h in b.holes)
+
+    config['kitchen_tall_unit']['gas_lifts']['enabled'] = True
+    config['kitchen_tall_unit']['gas_lifts']['opening_angle'] = 90
+    path.write_text(yaml.safe_dump(config))
+    ninety = load_kitchen_tall_unit(str(path))
+    boards_90 = {b.name: b for b in ninety.boards}
+    assert boards_90['fridge_top_lift_door'].opening_angle == 90
+    side_90 = boards_90['kitchen_left_side']
+    top_90 = boards_90['kitchen_top']
+    assert {top_90.pos[2] - h.z for h in side_90.holes
+            if h.kind == 'gas_lift_mount'} == {217, 249}
+    assert {top_90.pos[2] - h.z for h in boards_90['fridge_top_lift_door'].holes
+            if h.kind == 'gas_lift_mount'} == {38, 70}
+
+    config['kitchen_tall_unit']['gas_lifts']['opening_angle'] = 80
+    path.write_text(yaml.safe_dump(config))
+    with pytest.raises(ValueError, match='opening_angle'):
+        load_kitchen_tall_unit(str(path))
 
 
 def test_plinth_front_inset_uses_existing_parameter_and_keeps_rear_edge(tmp_path):
@@ -260,7 +326,7 @@ def test_two_column_appliance_layout_and_axis_drawers(tmp_path):
     for name in ('fridge_lower_door', 'fridge_upper_door'):
         assert any(h.kind == 'hinge_cup' for h in boards[name].holes)
     assert len([b for b in boards.values() if 'sliding_connector' in b.name]) == 4
-    assert not any(h.kind == 'gas_lift_mount' for b in boards.values() for h in b.holes)
+    assert sum(h.kind == 'gas_lift_mount' for b in boards.values() for h in b.holes) == 8
     grille, = [g for g in boards['kitchen_plinth_front'].grooves if g['kind'] == 'ventilation_cut_guide']
     assert (grille['width'], grille['height'], grille['groove_width'], grille['depth']) == (500, 40, 3.2, 2)
     assert len(guide_rectangles(grille)) == 4

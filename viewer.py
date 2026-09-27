@@ -38,11 +38,15 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 import yaml as _yaml
+from parts.motion import movable_group as _movable_group
+from parts.materials import texture_axes, face_texture_axes, edge_outline
 from parts.drawer import DrawerModel, Board, Hole, JointHole, load_drawer
 from parts.dresser import load_dresser as load_komoda
 from parts.desk_drawer_wall import load_desk_drawer_wall
 from parts.kitchen_tall_unit import load_kitchen_tall_unit
 from parts.kitchen_ventilation import routable_guide_rectangles
+from parts.gas_lift import (LIFT_OPEN_FRONT_CLEARANCE, LIFT_CLOSED_TOP_REVEAL,
+                            gas_lift_anchors)
 from parts.preview_mesh import board_mesh, ray_mesh
 
 
@@ -89,6 +93,8 @@ _TERMINAL_CHAR_KEYS = {
     ord('+'): Qt.Key.Key_Plus,
     ord('='): Qt.Key.Key_Equal,
     ord('-'): Qt.Key.Key_Minus,
+    ord('e'): Qt.Key.Key_E,
+    ord('E'): Qt.Key.Key_E,
     ord('p'): Qt.Key.Key_P,
     ord('P'): Qt.Key.Key_P,
     ord('n'): Qt.Key.Key_N,
@@ -199,23 +205,6 @@ class TerminalInput:
             self._process_buffer()
 
 
-def _movable_group(board: Board) -> str:
-    """Return the movable-group key (e.g. 'drawer_0') or 'default' for standalone drawers."""
-    if board.motion_parent:
-        match = re.match(r'^((?:tower|kitchen)_drawer_\d+)_', board.motion_parent)
-        return match.group(1) if match else board.motion_parent
-    if board.opening in ('lift_up', 'hinge_left', 'hinge_right'):
-        return board.name
-    m = re.match(r'^(fridge_(?:lower|upper)_door)_sliding_connector_', board.name)
-    if m:
-        return m.group(1)
-    m = re.match(r'^(drawer_\d+)_', board.name)
-    if m:
-        return m.group(1)
-    m = re.match(r'^((?:tower|kitchen)_drawer_\d+)_', board.name)
-    if m:
-        return m.group(1)
-    return 'keyboard_tray' if board.name.startswith('keyboard_tray') else 'default'
 
 
 def _ray_aabb(ro, rd, bmin, bmax):
@@ -257,8 +246,6 @@ HINGE_SIDE_REVEAL = 2.0
 HINGE_OPEN_FRONT_CLEARANCE = 18.0
 # Lift-up flap: with a 2 mm closed top reveal, its full thickness is aligned
 # between the inner and outer planes of the top panel at 90°.
-LIFT_OPEN_FRONT_CLEARANCE = 2.0
-LIFT_CLOSED_TOP_REVEAL = 2.0
 EYE_HEIGHT     = _cfg('initial_view.eye_height',     1500.0)   # mm
 
 
@@ -268,6 +255,7 @@ _SHORTCUTS = [
     ("View", [
         ("Home",               "reset view"),
         ("P",                  "toggle perspective / ortho"),
+        ("E",                  "edgebands: turquoise outlines on / off"),
         ("X / Y / Z",          "axis view; repeat for opposite side (keeps P mode)"),
         ("←→↑↓",              "pan"),
         ("Shift + ←→↑↓",      "rotate"),
@@ -382,6 +370,7 @@ class GLWidget(QOpenGLWidget):
         self._axis_centered = False
         self._axis_view = None
         self._texture_ids: dict[str, int] = {}
+        self.show_edgebands = True
 
     # ── API ───────────────────────────────────────────────────────────────────
 
@@ -546,12 +535,7 @@ class GLWidget(QOpenGLWidget):
             travel = self.model.max_travel if b.travel is None else b.travel
             amount = self._open_per_group.get(key, 0.0) * b.move_fraction
             if b.opening == 'lift_up':
-                # Top flap: horizontal X axis along its upper rear edge.
-                glTranslatef(0, -LIFT_OPEN_FRONT_CLEARANCE * amount,
-                             -(b.depth - LIFT_CLOSED_TOP_REVEAL) * amount)
-                glTranslatef(0, b.depth, b.height)
-                glRotatef(-90 * amount, 1, 0, 0)
-                glTranslatef(0, -b.depth, -b.height)
+                self._apply_lift_up_motion(b, amount)
             elif b.opening == 'hinge_left':
                 pivot_x = b.depth - HINGE_SIDE_REVEAL
                 glTranslatef(0, -HINGE_OPEN_FRONT_CLEARANCE * amount, 0)
@@ -590,10 +574,25 @@ class GLWidget(QOpenGLWidget):
                 glPopClientAttrib()
                 glPopMatrix()
                 return
+            material_texture = self._get_texture(b.material_texture) if b.material_texture else None
+            if material_texture:
+                glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_CURRENT_BIT)
+                glEnable(GL_TEXTURE_2D)
+                glBindTexture(GL_TEXTURE_2D, material_texture)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+                for coord, axis, scale in zip((GL_S, GL_T), texture_axes(b), b.texture_size):
+                    plane = [0., 0., 0., 0.]
+                    plane[axis] = 1. / scale
+                    glTexGeni(coord, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR)
+                    glTexGenfv(coord, GL_OBJECT_PLANE, plane)
+                glEnable(GL_TEXTURE_GEN_S)
+                glEnable(GL_TEXTURE_GEN_T)
+                glColor4f(1, 1, 1, alpha)
             rabbets = [g for g in b.grooves if g['kind'] in ('back_rabbet', 'drawer_bottom')]
             if rabbets:
                 depth = rabbets[0]['depth']
-                self._draw_box(b.width, b.depth - depth, b.height)
+                self._draw_box(b.width, b.depth - depth, b.height, b if material_texture else None)
                 # Split the rear layer at every machining boundary; omit cut cells.
                 xs = sorted({0, b.width, *[v for q in rabbets for v in (q['x'], q['x'] + q['span_x'])]})
                 zs = sorted({0, b.height, *[v for q in rabbets for v in (q['z'], q['z'] + q['span_z'])]})
@@ -604,8 +603,8 @@ class GLWidget(QOpenGLWidget):
                             continue
                         glPushMatrix()
                         glTranslatef(x1, b.depth - depth, z1)
-                        glColor4f(r, g, bv, alpha)
-                        self._draw_box(x2-x1, depth, z2-z1)
+                        glColor4f(*( (1, 1, 1, alpha) if material_texture else (r, g, bv, alpha)))
+                        self._draw_box(x2-x1, depth, z2-z1, b if material_texture else None)
                         glPopMatrix()
             elif b.preview_shape == 'cylinder_z':
                 glPushMatrix()
@@ -623,9 +622,23 @@ class GLWidget(QOpenGLWidget):
                 glPopMatrix()
             elif b.corner_radius > 0 and any(b.rounded_front_corners):
                 self._draw_rounded_box(b.width, b.depth, b.height, b.corner_radius,
-                                       b.rounded_front_corners)
+                                       b.rounded_front_corners, b if material_texture else None)
             else:
-                self._draw_box(b.width, b.depth, b.height)
+                self._draw_box(b.width, b.depth, b.height, b if material_texture else None)
+            if material_texture:
+                glPopAttrib()
+            if self.show_edgebands and b.edgebands:
+                glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LINE_BIT)
+                glDisable(GL_LIGHTING)
+                glDisable(GL_TEXTURE_2D)
+                glLineWidth(3)
+                glColor4f(0.0, 0.85, 0.95, alpha)
+                for face in b.edgebands:
+                    glBegin(GL_LINE_LOOP)
+                    for point in edge_outline(b, face):
+                        glVertex3f(*point)
+                    glEnd()
+                glPopAttrib()
             glPopMatrix()
 
         def draw_slide_holes(b):
@@ -740,13 +753,154 @@ class GLWidget(QOpenGLWidget):
 
         for b in boards:
             draw_grooves(b)
+        self._draw_gas_lifts(by_name)
         self._draw_grid()
 
-    def _draw_textured_face(self, board, alpha):
-        """Draw a project image on the front face of a preview board."""
-        texture_id = self._texture_ids.get(board.texture)
+    @staticmethod
+    def _apply_lift_up_motion(door, amount):
+        """The same flap transform used for its panel and moving hardware."""
+        glTranslatef(0, -LIFT_OPEN_FRONT_CLEARANCE * amount,
+                     -(door.depth - LIFT_CLOSED_TOP_REVEAL) * amount)
+        glTranslatef(0, door.depth, door.height)
+        glRotatef(-door.opening_angle * amount, 1, 0, 0)
+        glTranslatef(0, -door.depth, -door.height)
+
+    @staticmethod
+    def _gas_axis(q, start, end):
+        """Position a local +Z cylinder along a segment in model coordinates."""
+        delta = tuple(end[i] - start[i] for i in range(3))
+        length = math.sqrt(sum(v * v for v in delta))
+        glTranslatef(*start)
+        axis = (-delta[1], delta[0], 0)
+        if math.hypot(axis[0], axis[1]) > 1e-6:
+            glRotatef(math.degrees(math.acos(max(-1, min(1, delta[2] / length)))), *axis)
+        elif delta[2] < 0:
+            glRotatef(180, 1, 0, 0)
+        return length
+
+    def _draw_gas_plate_end(self, q, center, normal, radius, thickness):
+        """Rounded end of a thin mounting plate, facing its screw axis."""
+        glPushMatrix()
+        self._gas_axis(q, center,
+                       tuple(center[i] + normal[i] * thickness for i in range(3)))
+        gluCylinder(q, radius, radius, thickness, 16, 1)
+        glTranslatef(0, 0, thickness)
+        gluDisk(q, 0, radius, 16, 1)
+        glPopMatrix()
+
+    def _draw_gas_screw(self, q, center, normal):
+        """Flat screw head on the visible face of a mounting plate."""
+        glPushMatrix()
+        self._gas_axis(q, center, tuple(center[i] + normal[i] for i in range(3)))
+        glColor4f(0.53, 0.55, 0.57, 1)
+        gluCylinder(q, 3.3, 3.3, 0.8, 12, 1)
+        glTranslatef(0, 0, 0.8)
+        gluDisk(q, 0, 3.3, 12, 1)
+        glColor4f(0.13, 0.14, 0.16, 1)
+        glTranslatef(0, 0, 0.15)
+        gluDisk(q, 0, 0.9, 12, 1)
+        glPopMatrix()
+
+    def _draw_gas_lifts(self, by_name):
+        """Show the GTV mounting plates, ball joints, barrel and sliding rod."""
+        if not self.model.gas_lifts:
+            return
+        q = gluNewQuadric()
+        gluQuadricNormals(q, GLU_SMOOTH)
+        for lift in self.model.gas_lifts:
+            door = by_name[lift.door_board]
+            side = by_name[lift.side_board]
+            amount = self._open_per_group.get(lift.door_board, 0.0) * door.move_fraction
+            fixed, moving = gas_lift_anchors(lift, by_name, amount)
+            if math.dist(fixed, moving) < 2 * lift.socket_length + 20:
+                continue
+
+            # The carcass foot is a 48 mm plate, two visible screw heads and
+            # a projecting ball stud. The other plate moves with the door.
+            sign = 1 if lift.side_anchor[0] > side.width / 2 else -1
+            inner_x = fixed[0] - sign * lift.side_projection
+            plate_thickness = 3.0
+            end_radius = min(lift.plate_width / 2,
+                             (lift.plate_length - lift.fixing_spacing) / 2)
+            glColor4f(0.23, 0.25, 0.28, 1)
+            glPushMatrix()
+            glTranslatef(inner_x + (0 if sign == 1 else -plate_thickness),
+                         fixed[1] - lift.plate_width / 2,
+                         fixed[2] - lift.fixing_spacing / 2)
+            self._draw_box(plate_thickness, lift.plate_width, lift.fixing_spacing)
+            glPopMatrix()
+            for dz in (-lift.fixing_spacing / 2, lift.fixing_spacing / 2):
+                glColor4f(0.23, 0.25, 0.28, 1)
+                self._draw_gas_plate_end(q, (inner_x, fixed[1], fixed[2] + dz),
+                                         (sign, 0, 0), end_radius,
+                                         plate_thickness)
+                self._draw_gas_screw(q,
+                    (inner_x + sign * (plate_thickness + 0.1), fixed[1], fixed[2] + dz),
+                    (sign, 0, 0))
+            glPushMatrix()
+            self._gas_axis(q, (inner_x + sign * plate_thickness, fixed[1], fixed[2]), fixed)
+            glColor4f(0.27, 0.29, 0.31, 1)
+            gluCylinder(q, 4.2, 4.2, lift.side_projection - plate_thickness, 16, 1)
+            glPopMatrix()
+
+            glPushMatrix()
+            glTranslatef(*door.pos)
+            self._apply_lift_up_motion(door, amount)
+            face_y = door.depth
+            cx, _, cz = lift.door_anchor
+            glColor4f(0.23, 0.25, 0.28, 1)
+            glPushMatrix()
+            glTranslatef(cx - lift.plate_width / 2, face_y,
+                         cz - lift.fixing_spacing / 2)
+            self._draw_box(lift.plate_width, plate_thickness, lift.fixing_spacing)
+            glPopMatrix()
+            for dz in (-lift.fixing_spacing / 2, lift.fixing_spacing / 2):
+                glColor4f(0.23, 0.25, 0.28, 1)
+                self._draw_gas_plate_end(q, (cx, face_y, cz + dz),
+                                         (0, 1, 0), end_radius,
+                                         plate_thickness)
+                self._draw_gas_screw(q,
+                    (cx, face_y + plate_thickness + 0.1, cz + dz), (0, 1, 0))
+            glPushMatrix()
+            self._gas_axis(q, (cx, face_y + plate_thickness, cz), lift.door_anchor)
+            glColor4f(0.27, 0.29, 0.31, 1)
+            gluCylinder(q, 4.2, 4.2, lift.front_projection - plate_thickness, 16, 1)
+            glPopMatrix()
+            glPopMatrix()
+
+            # GTV Ø12: the wide barrel is at the flap, the Ø4 rod at the
+            # carcass. The 31 mm end sockets and 115 mm barrel are from its
+            # product drawing; only the rod's visible length changes.
+            glPushMatrix()
+            length = self._gas_axis(q, moving, fixed)
+            socket = lift.socket_length
+            barrel_end = min(socket + lift.barrel_length, length - socket - 7)
+            glColor4f(0.16, 0.17, 0.19, 1)
+            gluSphere(q, 6.5, 16, 12)
+            gluCylinder(q, 6.5, 6.5, socket, 20, 1)
+            glTranslatef(0, 0, socket)
+            glColor4f(0.31, 0.33, 0.36, 1)
+            gluCylinder(q, lift.barrel_diameter / 2, lift.barrel_diameter / 2,
+                        barrel_end - socket, 20, 1)
+            glTranslatef(0, 0, barrel_end)
+            glColor4f(0.20, 0.22, 0.24, 1)
+            gluCylinder(q, 6.8, 6.8, 5, 20, 1)
+            glTranslatef(0, 0, 5)
+            glColor4f(0.43, 0.47, 0.51, 1)
+            gluCylinder(q, lift.rod_diameter / 2, lift.rod_diameter / 2,
+                        length - socket - barrel_end - 5, 12, 1)
+            glTranslatef(0, 0, length - socket - barrel_end - 5)
+            glColor4f(0.16, 0.17, 0.19, 1)
+            gluCylinder(q, 6.5, 6.5, socket, 16, 1)
+            glTranslatef(0, 0, socket)
+            gluSphere(q, 6.5, 16, 12)
+            glPopMatrix()
+        gluDeleteQuadric(q)
+
+    def _get_texture(self, texture):
+        texture_id = self._texture_ids.get(texture)
         if texture_id is None:
-            path = Path(board.texture)
+            path = Path(texture)
             if not path.is_absolute():
                 path = Path(__file__).parent / path
             image = QImage(str(path)).convertToFormat(QImage.Format.Format_RGBA8888)
@@ -762,7 +916,14 @@ class GLWidget(QOpenGLWidget):
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width(), image.height(), 0,
                          GL_RGBA, GL_UNSIGNED_BYTE,
                          image.constBits().asstring(image.sizeInBytes()))
-            self._texture_ids[board.texture] = texture_id
+            self._texture_ids[texture] = texture_id
+        return texture_id
+
+    def _draw_textured_face(self, board, alpha):
+        """Draw a project image on the front face of a preview board."""
+        texture_id = self._get_texture(board.texture)
+        if texture_id is None:
+            return
         glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT)
         glDisable(GL_LIGHTING)
         glEnable(GL_TEXTURE_2D)
@@ -778,7 +939,10 @@ class GLWidget(QOpenGLWidget):
         glEnd()
         glPopAttrib()
 
-    def _draw_box(self, w, d, h):
+    def _draw_box(self, w, d, h, texture_board=None):
+        if texture_board:
+            glPushAttrib(GL_ENABLE_BIT)
+            glDisable(GL_TEXTURE_GEN_S); glDisable(GL_TEXTURE_GEN_T)
         v = [(0,0,0),(w,0,0),(w,d,0),(0,d,0),(0,0,h),(w,0,h),(w,d,h),(0,d,h)]
         faces = [
             ([0,1,2,3],(0,0,-1)),([4,5,6,7],(0,0,1)),
@@ -786,9 +950,12 @@ class GLWidget(QOpenGLWidget):
             ([0,3,7,4],(-1,0,0)),([1,2,6,5],(1,0,0)),
         ]
         glBegin(GL_QUADS)
-        for idx, n in faces:
+        for (idx, n), face in zip(faces, ('bottom','top','front','rear','left','right')):
             glNormal3f(*n)
+            axes = face_texture_axes(texture_board, face) if texture_board else None
             for i in idx:
+                if axes:
+                    glTexCoord2f(*(v[i][axis]/scale for axis,scale in zip(axes,texture_board.texture_size)))
                 glVertex3f(*v[i])
         glEnd()
         edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),(0,4),(1,5),(2,6),(3,7)]
@@ -799,8 +966,10 @@ class GLWidget(QOpenGLWidget):
             glVertex3f(*v[a]); glVertex3f(*v[b])
         glEnd()
         glEnable(GL_LIGHTING)
+        if texture_board:
+            glPopAttrib()
 
-    def _draw_rounded_box(self, w, d, h, radius, rounded):
+    def _draw_rounded_box(self, w, d, h, radius, rounded, texture_board=None):
         """Draw a board with optional rounded front-left and front-right corners."""
         left, right = rounded
         r = min(radius, w / 2, d)
@@ -827,14 +996,28 @@ class GLWidget(QOpenGLWidget):
         glNormal3f(0, 0, -1); glBegin(GL_POLYGON)
         for x, y in reversed(outline): glVertex3f(x, y, 0)
         glEnd()
+        if texture_board:
+            glPushAttrib(GL_ENABLE_BIT)
+            glDisable(GL_TEXTURE_GEN_S); glDisable(GL_TEXTURE_GEN_T)
+        distance = 0.
         glBegin(GL_QUADS)
         for index, (x1, y1) in enumerate(outline):
             x2, y2 = outline[(index + 1) % len(outline)]
             dx, dy = x2 - x1, y2 - y1
             length = math.hypot(dx, dy)
             glNormal3f(dy / length, -dx / length, 0)
-            glVertex3f(x1, y1, 0); glVertex3f(x2, y2, 0)
-            glVertex3f(x2, y2, h); glVertex3f(x1, y1, h)
+            face = ('left' if x1 == x2 == 0 else 'right' if x1 == x2 == w
+                    else 'rear' if y1 == y2 == d else 'front')
+            for x,y,z,along in ((x1,y1,0,distance),(x2,y2,0,distance+length),
+                                 (x2,y2,h,distance+length),(x1,y1,h,distance)):
+                if texture_board:
+                    if face in texture_board.edgebands:
+                        glTexCoord2f(along/texture_board.texture_size[0],z/texture_board.texture_size[1])
+                    else:
+                        point=(x,y,z)
+                        glTexCoord2f(*(point[axis]/scale for axis,scale in zip(texture_axes(texture_board),texture_board.texture_size)))
+                glVertex3f(x,y,z)
+            distance += length
         glEnd()
         glLineWidth(1.0); glDisable(GL_LIGHTING); glColor3f(0.2, 0.15, 0.1)
         glBegin(GL_LINE_LOOP)
@@ -845,6 +1028,8 @@ class GLWidget(QOpenGLWidget):
         for x, y in outline:
             glVertex3f(x, y, 0); glVertex3f(x, y, h)
         glEnd(); glEnable(GL_LIGHTING)
+        if texture_board:
+            glPopAttrib()
 
     def _draw_hole(self, direction, diameter, depth, through=False):
         surface_r = diameter / 2; tip_r = surface_r if through else 0.0; overshoot = 0.3
@@ -1041,7 +1226,7 @@ class GLWidget(QOpenGLWidget):
                     pivot = np.array([0.0, b.depth, b.height])
                     point[1] += LIFT_OPEN_FRONT_CLEARANCE * amount
                     point[2] += (b.depth - LIFT_CLOSED_TOP_REVEAL) * amount
-                    angle = math.radians(90 * amount)  # inverse of -90° render rotation
+                    angle = math.radians(b.opening_angle * amount)
                     c, s = math.cos(angle), math.sin(angle)
                     inverse_motion = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
                     point = pivot + inverse_motion @ (point - pivot)
@@ -1175,6 +1360,10 @@ class MainWindow(QMainWindow):
         # Help
         if k == Key.Key_H:
             HelpDialog(self).show(); return
+
+        if k == Key.Key_E:
+            self.gl.show_edgebands = not self.gl.show_edgebands
+            self.gl.update(); return
 
         # Perspective / ortho
         if k == Key.Key_P:

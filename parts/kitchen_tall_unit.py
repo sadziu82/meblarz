@@ -1,10 +1,12 @@
 """Two-column kitchen tall unit with appliance niches and Axis Pro drawers."""
 
+from parts.shelves import default_shelf_setback, shelf_geometry
 from pathlib import Path
 
 import yaml
 
 from parts.drawer import Board, DrawerModel, Hole, _center_model
+from parts.gas_lift import add_gas_lifts
 from parts.front_rules import SIDE_REVEAL, END_REVEAL, VERTICAL_GAP, DOUBLE_DOOR_GAP
 from parts.axis_pro import axis_spec, add_axis_drawer
 from parts.kitchen_hardware import add_side_hinges, add_lift_hinges, add_handles, hinge_spec
@@ -209,8 +211,9 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
     with Path(path).open() as stream:
         root = yaml.safe_load(stream)
     cfg = root['kitchen_tall_unit']
+    default_setback = default_shelf_setback(root)
     hinge = hinge_spec(cfg.get('hinges', {}))
-    material = cfg.get('material', {})
+    material = {**root.get('material', {}), **cfg.get('material', {})}
     t = float(material.get('thickness', 18))
     h = float(cfg['height'])
     d = float(cfg['depth'])
@@ -303,9 +306,14 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
     top_door = Board('fridge_top_lift_door', front_width, h - END_REVEAL - lift_bottom, 18,
                      ((left_outer-front_width)/2, -18, lift_bottom), _WOOD, movable=True)
     top_door.opening = 'lift_up'
+    lift_cfg = cfg.get('gas_lifts', {})
+    top_door.opening_angle = lift_cfg.get('opening_angle', 90)
+    if top_door.opening_angle not in (75, 90):
+        raise ValueError('gas_lifts.opening_angle must be 75 or 90 degrees')
     boards.append(top_door)
     top_panel = next(b for b in boards if b.name in ('kitchen_top', 'kitchen_top_left'))
     add_lift_hinges(top_door, top_panel, hinge)
+    gas_lifts = add_gas_lifts(top_door, boards[0], boards[1], top_panel, lift_cfg)
     appliance_w, appliance_h, appliance_d = fridge_model['envelope']
     if appliance_w > fridge_w or appliance_h > fridge_h or appliance_d > fridge_d:
         raise ValueError('Fridge appliance envelope exceeds its niche')
@@ -467,10 +475,11 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
     add_side_hinges(right_door, 'right', boards[3], hinge)
     shelves = int(right.get('upper_cabinet', {}).get(
         'shelves', right.get('upper_cabinet', {}).get('shelves_per_bay', 1)))
+    shelf_setback, shelf_depth = shelf_geometry(d, right.get('upper_cabinet', {}), default_setback)
     for idx in range(shelves):
         shelf_z = round((upper_z + (idx+1) * upper_h / (shelves+1)) * 2) / 2
-        boards.append(Board(f'right_upper_shelf_{idx}', right_clear, t, d,
-                            (r_x, 0, shelf_z), _SHELF, movable=False))
+        boards.append(Board(f'right_upper_shelf_{idx}', right_clear, t, shelf_depth,
+                            (r_x, shelf_setback, shelf_z), _SHELF, movable=False))
     cutout = microwave.get('side_cutout', {})
     if cutout.get('enabled', False):
         cut_depth = float(cutout.get('depth', 120))
@@ -504,7 +513,7 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
         'GTV AXIS PRO: 16 mm bottom (LW-75 × NL-24) and rear (LW-87). Cut rear heights D/B/A: 199/116/84; purchased sides: 200/120/86. Catalogue pp.6–8 drilling; Ø2 × 12 connectors, project Ø3 × 12 runner pilots. Metal profile shape is simplified.',
         'AXIS PRO: GTV recommends additional railing for fronts taller than 284 mm; select and fit that accessory with its supplied template. Bottom fixing screws follow the metal-side template, not a guessed CNC pattern.',
         'GTV ZM-INHC09H04-BE H0: Ø35 × 12 cups, K=3 mm, cup-screw spacing 45 mm (offset 9.5); plate spacing 32 mm at 37 mm. Ø2.5 × 10 screw pilots are a project choice. Lift hinges attach to the top panel, adjusted -1 mm for 15 mm overlay.',
-        'GTV NEO lift drilling is not generated: the previous unverified positions were removed. Choose force for the front mass and transfer the mounting template supplied with the lifts.',
+        f'GTV NEO Ø12: two lifts. GTV technical card p.2, {top_door.opening_angle:g}° overlay row from db/gas_lifts.yaml; side screw spacing 32 mm at 19.5 mm from the front, front screws vertically spaced 32 mm. Ø2.5 × 10 mm screw pilots are a project choice for supplied 3.5 × 16 mm screws. Confirm the selected 80 N force against the actual front mass.',
         'Carcass joints: dowels on visible outer cheeks; confirmats through hidden inner cheeks and outer top/bottom faces. Assemble inner-cheek screws before joining columns. Plinth-clip fixing is still unresolved.',
     ]
     ties = joinery.get('column_ties') or {}
@@ -513,12 +522,6 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
     if grille.get('enabled', True):
         notes.append('Refrigerator ventilation: plinth, bottom, middle and top boards remain rectangular for cutting. Groove segments within the selected edge-distance limit and shallow Ø3 drill markers on unreachable segments trace the material to remove separately. The upper cabinet has furniture-board back ahead of the rear channel.')
     issues = [
-        dict(operation='axis_bottom_fixing',
-             boards=[f'kitchen_drawer_{i}_bottom' for i in range(3)],
-             reason='Brak wymiarowanego szablonu wkrętów mocujących dno do metalowych boków AXIS PRO.'),
-        dict(operation='gas_lift_mount',
-             boards=['fridge_top_lift_door', 'kitchen_left_side', 'kitchen_left_right_side'],
-             reason='Brak potwierdzonego szablonu montażowego i doboru podnośników klapy.'),
         dict(operation='fridge_slider_mount', boards=['fridge_lower_door', 'fridge_upper_door'],
              reason='Pozycje łączników Samsung są orientacyjne; brakuje szablonu ich mocowania.'),
     ]
@@ -526,6 +529,13 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
         issues.append(dict(operation='plinth_clip_mount',
                            boards=[b.name for b in plinth_boards],
                            reason='Klipsy cokołu Emuca Bone wymagają ustalenia sposobu zamocowania do płyt cokołu.'))
-    return DrawerModel(boards=_center_model(boards), max_travel=nl,
+    from parts.materials import apply_finishes
+    apply_finishes(boards, {**root, 'material': material})
+    return DrawerModel(boards=_center_model(boards), gas_lifts=gas_lifts, max_travel=nl,
                        slide_model='GTV Axis Pro', slide_nl=int(nl), drawer_count=3,
-                       joints=joints, notes=notes, machining_issues=issues)
+                       joints=joints, notes=notes, machining_issues=issues,
+                       assembly_operations=[
+                           'AXIS PRO: dna trzech szuflad przykręcić podczas montażu od spodu, '
+                           'przez otwory w metalowych bokach, używając ich jako szablonu '
+                           '(instrukcja GTV, str. 9, montaż szuflady, krok 4). '
+                           'Nie zlecać tych nawiertów w rozkroju.'])

@@ -1,0 +1,27 @@
+materials:
+  EGGER-H1318-ST10:
+    name: EGGER H1318 ST10 Dąb dziki naturalny
+    meble_pl: {decor: H1318, structure: ST10, manufacturer: EGGER}
+    texture: assets/materials/egger-h1318-st10.jpg
+    # Approximate preview scale, not a manufacturer-specified decor repeat.
+    texture_size_mm: [900, 600]
+    source: https://www.meble.pl/gfx/meble/sklep_kategorie/260/3263261/563206853.jpg
+  KRONOSPAN-U0164-ST9:
+    name: Płyta meblowa Kronospan U0164 U0164 Antracyt
+    meble_pl:
+      decor: U0164
+      structure: ST9
+      manufacturer: Kronospan
+      # The form uses the alias "0164 ST9 ... (u963)"; identify the actual SKU.
+      product_codes:
+        16: P16ST41MEB11.U0164.ST9.KRO
+    texture: assets/materials/kronospan-u0164-st9.jpg
+    texture_size_mm: [260, 260]
+    source: https://www.meble.pl/plyty-meblowe/16-mm/
+  EGGER-U999-ST19:
+    name: EGGER U999 ST19 Czarny
+    meble_pl: {decor: U999, structure: ST19, manufacturer: EGGER}
+    texture: assets/materials/egger-u999-st19.jpg
+    # Approximate scale of the supplier's preview sample.
+    texture_size_mm: [260, 260]
+    source: https://www.meble.pl/rozkroj,plyta3428500

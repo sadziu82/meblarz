@@ -5,7 +5,7 @@ import yaml
 
 from parts.drawer import _resolve_handle, _load_slides_db
 from parts.desk_drawer_wall import load_desk_drawer_wall
-from export_meblepl import export
+from export import export
 
 PROJECT = Path(__file__).parents[1] / 'projects/desk_drawer_wall.yaml'
 

@@ -92,7 +92,9 @@ def add_handles(boards, config):
             cx = front.width - edge if front.opening == 'hinge_left' else edge
             # Freezer handle near the upper edge; upper doors near the bottom.
             cz = front.height - end - spacing / 2 if front.name == 'fridge_lower_door' else end + spacing / 2
-        # Preserve exact centring, including quarter-mm centres of half-mm fronts.
+        # Round the common centre once, preserving mounting-hole spacing.
+        from parts.precision import mm
+        cx, cz = mm(cx), mm(cz)
         dx, dz = (0, spacing / 2) if vertical else (spacing / 2, 0)
         bw, bh = (width, length) if vertical else (length, width)
         if min(cx - bw / 2, cz - bh / 2) < 0 or cx + bw / 2 > front.width or cz + bh / 2 > front.height:

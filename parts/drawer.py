@@ -55,13 +55,38 @@ class Board:
     fabrication: bool = True  # False for purchased equipment shown only in preview
     yaw: float = 0.0  # preview rotation about local Z at pos, degrees
     opening: str = ''  # e.g. lift_up; construction/preview metadata
+    opening_angle: float = 90.0  # full opening angle for lift-up fronts
     label: str = ''  # non-production equipment label
     texture: str = ''  # project-relative image shown on this preview-only board
+    material_id: str = ''
+    material_texture: str = ''
+    texture_size: Tuple[float, float] = (900, 600)
+    edgebands: dict[str, float] = field(default_factory=dict)
+    covered_edges: tuple[str, ...] = ()  # edges permanently concealed by purchased fittings
     preview_shape: str = ''  # 'cylinder_z' for round purchased equipment
     motion_parent: str = ''  # preview hardware follows this board's complete motion
     preview_mesh: str = ''  # normalized OBJ, positioned/scaled by the preview board
     cabinet_id: str = ''  # separate carcass identity for adjacent-cabinet joinery
     cabinet_side: str = ''  # 'left' or 'right' outer cheek of that carcass
+
+
+@dataclass
+class GasLiftPreview:
+    """Purchased lift; anchor offsets are preview geometry, never drilling data."""
+    model: str
+    side_board: str
+    door_board: str
+    side_anchor: Tuple[float, float, float]
+    door_anchor: Tuple[float, float, float]
+    fixing_spacing: float = 32
+    plate_length: float = 48
+    plate_width: float = 16
+    side_projection: float = 26
+    front_projection: float = 16
+    barrel_diameter: float = 12
+    rod_diameter: float = 4
+    barrel_length: float = 115
+    socket_length: float = 31
 
 
 @dataclass
@@ -75,6 +100,8 @@ class DrawerModel:
     drawer_count: int = 0  # 0 = standalone drawer, >0 = dresser
     notes: List[str] = field(default_factory=list)
     machining_issues: List[dict] = field(default_factory=list)
+    gas_lifts: List[GasLiftPreview] = field(default_factory=list)
+    assembly_operations: List[str] = field(default_factory=list)
 
 
 _SLIDES_DB: dict | None = None
@@ -428,8 +455,12 @@ def _shift_boards(boards: list[Board], dx: float, dy: float, dz: float) -> list[
             fabrication=b.fabrication,
             yaw=b.yaw,
             opening=b.opening,
+            opening_angle=b.opening_angle,
             label=b.label,
             texture=b.texture,
+            material_id=b.material_id, material_texture=b.material_texture,
+            texture_size=b.texture_size, edgebands=dict(b.edgebands),
+            covered_edges=b.covered_edges,
             preview_shape=b.preview_shape,
             motion_parent=b.motion_parent,
             preview_mesh=b.preview_mesh,
@@ -486,7 +517,8 @@ def load_drawer(path: str) -> DrawerModel:
                                        target_nl=target_nl,
                                        handle=cfg['front'].get('handle'),
                                        box_bottom_offset=carcass_t + 2 if cfg['front'].get('mount') == 'overlay' else 2)
-    boards = _center_model(boards)
+    from parts.materials import apply_finishes
+    boards = apply_finishes(_center_model(boards), cfg)
 
     return DrawerModel(
         boards=boards,

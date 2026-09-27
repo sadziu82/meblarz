@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from parts.desk_drawer_wall import load_desk_drawer_wall
-from export_meblepl import export
+from export import export
 
 SOURCE = Path(__file__).parent / 'fixtures' / 'desk_measured.yaml'
 PROJECT = Path(__file__).parents[1] / 'projects' / 'desk_drawer_wall.yaml'
