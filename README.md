@@ -704,16 +704,18 @@ DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --no-calcul
 `exports/NAZWA-meblepl-DATA-CZAS/`. `--close` zamyka okno po zakończeniu;
 `--headless` uruchamia bez GUI i również zamyka przeglądarkę.
 
+W przykładach poniżej zastąp fikcyjny numer `12345678` numerem własnego rozkroju.
+
 Porównanie zapisanego rozkroju z aktualnym YAML-em (bez zmiany danych na stronie):
 
 ```bash
-DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --verify https://www.meble.pl/rozkroj,r20145925
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --verify https://www.meble.pl/rozkroj,r12345678
 ```
 
 Odtworzenie wszystkich formatek z YAML-a na podstawie istniejącego rozkroju:
 
 ```bash
-DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --recreate https://www.meble.pl/rozkroj,r20145925
+DISPLAY=:98 python cutting.py --vendor meble.pl projects/drawer.yaml --recreate https://www.meble.pl/rozkroj,r12345678
 ```
 
 `--recreate` zastępuje listy formatek wraz z obróbką i obrzeżami, usuwa zbędne
@@ -791,3 +793,36 @@ Skrypty `cutting.py` (formularz przeglądarkowy) i `export.py` (pliki CSV, DXF
 i dokumentacja) wymagają `--vendor meble.pl`. Obecnie jest to jedyny
 obsługiwany dostawca; brak opcji lub inna nazwa kończy działanie przed
 wczytaniem projektu i uruchomieniem przeglądarki.
+
+## Wersjonowanie i wydania
+
+Aktualną wersję zawiera plik `VERSION`. Format to `rok.miesiąc.numer`,
+np. `2026.9.1`; w nowym miesiącu numer zaczyna się od 1.
+Mechanizm odpowiada poleceniom wydawniczym projektu `money`.
+
+```bash
+make help
+make bump                 # następna wersja i lokalny commit VERSION
+make release              # następna wersja, commit, push gałęzi i tagu
+make release FORCE=1      # wydanie również bez zmian od ostatniego tagu
+```
+
+`make release` wymaga braku niezacommitowanych zmian w śledzonych plikach.
+Domyślnie wysyła `HEAD` na `origin/master`, następnie tworzy i wysyła
+opisany tag `vROK.MIESIĄC.NUMER`. Sprawdza wcześniej, czy docelowy tag
+nie istnieje lokalnie ani zdalnie. Bez nowych commitów od ostatniego wydania
+wypisuje ostrzeżenie i niczego nie zmienia, chyba że podano `FORCE=1`.
+Nieśledzone pliki pozostają nietknięte i nie trafiają do commita.
+
+Można zmienić interpreter, zdalne repozytorium i docelową gałąź:
+
+```bash
+make release PYTHON=venv/bin/python REMOTE=origin BRANCH=master
+```
+
+Nie uruchamiaj `make bump` przed zwykłym `make release`: wydanie wykonuje
+własne podniesienie wersji. Polecenia nie uruchamiają testów automatycznie;
+przed wydaniem wykonaj `venv/bin/python -m pytest -q`.
+Jeżeli publikacja zakończy się błędem po utworzeniu commita lub tagu,
+sprawdź stan Git i dokończ brakujący push ręcznie — ponowne `make release`
+może podnieść wersję ponownie.

@@ -256,3 +256,12 @@ Po błędzie sprawdź raport i zachowane okno. Nie ma automatycznego wznowienia
 od ostatniego otworu; ponowne zwykłe uruchomienie zaczyna nowy formularz.
 `--recreate` wymaga zapisanego URL-a i odtwarza całość. Przed zamówieniem
 sprawdź wynik, także osobne prace wskazane w raporcie.
+
+### Prywatność plików lokalnych
+
+W `plan.json` pole `source` zapisuje ścieżkę względem repozytorium albo samą
+nazwę pliku dla projektów spoza repozytorium, bez ścieżki katalogu użytkownika.
+Katalog `exports/` nie jest wersjonowany: zawiera prywatne adresy rozkrojów,
+kopie formularzy, zrzuty ekranu i profil przeglądarki (w tym dane sesji).
+Nie publikuj go w całości. Starsze plany mogą zawierać pełne lokalne ścieżki.
+Nagrania ekranu i pliki `.env` również są pomijane przez Git.

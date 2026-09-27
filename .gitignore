@@ -7,3 +7,10 @@ __pycache__/
 *.stl
 projects/.dresser.yaml.swp
 *.swp
+
+# Local screen recordings and browser/session data are not project sources.
+*.mkv
+*.mp4
+.env
+.env.*
+!.env.example

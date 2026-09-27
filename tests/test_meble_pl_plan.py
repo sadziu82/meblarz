@@ -94,3 +94,15 @@ def test_axis_bottom_fixing_is_reported_as_assembly_work(tmp_path):
     assert any('AXIS PRO' in note and 'podczas montażu' in note for note in plan['manual_finishing'])
     save_plan(plan,tmp_path)
     assert 'dna trzech szuflad przykręcić podczas montażu' in (tmp_path/'raport.md').read_text()
+
+
+def test_plan_source_does_not_expose_local_directories(tmp_path):
+    plan = make_plan(ROOT / 'projects/drawer.yaml')
+    assert plan['source'] == 'projects/drawer.yaml'
+    project = tmp_path / 'private-directory' / 'drawer.yaml'
+    project.parent.mkdir()
+    project.write_bytes((ROOT / 'projects/drawer.yaml').read_bytes())
+    plan = make_plan(project)
+    assert plan['source'] == 'drawer.yaml'
+    save_plan(plan, tmp_path / 'report')
+    assert str(tmp_path) not in (tmp_path / 'report' / 'plan.json').read_text()

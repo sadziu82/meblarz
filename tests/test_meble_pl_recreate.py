@@ -3,7 +3,7 @@ import pytest
 from cutting import main
 
 PROJECT = Path(__file__).resolve().parents[1] / 'projects/drawer.yaml'
-URL = 'https://www.meble.pl/rozkroj,r20145925'
+URL = 'https://www.meble.pl/rozkroj,r12345678'
 
 
 @pytest.mark.parametrize('flags', [

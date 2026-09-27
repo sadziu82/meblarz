@@ -66,7 +66,12 @@ def make_plan(source):
         supplier = selected.get('meble_pl', {})
         if not supplier.get('decor') or not supplier.get('structure'):
             raise ValueError(f'Płyta {t:g} mm: wymagane meble_pl.decor i meble_pl.structure')
-    plan = dict(source=str(source.resolve()), status='draft', groups=[],
+    # Reports must not expose local usernames or parent directory names.
+    try:
+        source_label = source.resolve().relative_to(Path(__file__).resolve().parents[1]).as_posix()
+    except ValueError:
+        source_label = source.name
+    plan = dict(source=source_label, status='draft', groups=[],
                 unresolved=model.machining_issues, manual=[], notes=model.notes,
                 manual_finishing=list(model.assembly_operations))
     groups = {}
