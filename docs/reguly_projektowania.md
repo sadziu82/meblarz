@@ -186,7 +186,7 @@
 87. Kanał wentylacyjny lodówki ma cztery parametryzowane poziomy (`fridge_ventilation.openings`, domyślnie 500 × 40mm): przód cokołu, płytę dolną, przegrodę nad lodówką i płytę górną. Formatki do rozkroju pozostają prostokątne. Obrys przyszłego ręcznego wycięcia trasować wręgiem 3,2 × 2mm tylko tam, gdzie oś wręgu leży nie dalej niż 50mm od równoległej krawędzi. Odcinki poza tym zasięgiem zaznaczyć płytkimi nawiertami Ø3 × 2mm, około co 20mm, z pierwszym i ostatnim 5mm od końców odcinka. Domyślnie cokół ma dwa wręgi i dwa rzędy nawiertów, a każda płyta pozioma jeden wręg i dwa rzędy nawiertów. Parametry są w `fridge_ventilation.guide`. Znaczniki nie tworzą otworu — materiał wyciąć później. Górna szafka ma plecy z płyty meblowej; ich grubość wynika z `material.thickness`, a `upper_back.clearance` pozostawia 10mm do otworu wentylacyjnego. Przebieg kanału i kratkę potwierdzić z instrukcją lodówki przed wykonaniem.
     Źródło limitu 50mm: [Centrum Meble.pl — wręgowanie](https://centrum.meble.pl/uslugi/wregowanie). [Inna strona sklepu](https://www.meble.pl/plyty-informacje) podaje 40mm; przed zamówieniem sprawdzić limit w aktywnym formularzu. W YAML-u limit jest parametrem.
 
-88. Fronty nakładane: 2mm luzu od zewnętrznego obrysu korpusu po lewej i prawej; 3mm od skrajnej dolnej i górnej krawędzi grupy; 3mm łącznie między frontami w pionie; 2mm łącznie między podwójnymi drzwiami. Dla płyty 18mm nachodzenie wynosi 16mm na boki i 15mm na poziome płyty skrajne. Wymiary i pozycje wyliczać wspólnie (parts/front_rules.py), podziały w kroku 0,5mm, z zachowaniem sumy wysokości. Przy AGD obowiązują wymagania modelu urządzenia. Zasada dotyczy frontów nakładanych; fronty wpuszczane mają osobne parametry. Zastępuje wcześniejsze przykłady 3mm luzu bocznego oraz 3mm między drzwiami podwójnymi.
+88. Fronty nakładane: 2mm luzu od zewnętrznego obrysu korpusu po lewej i prawej; 3mm od skrajnej dolnej i górnej krawędzi grupy; 3mm łącznie między frontami w pionie; 2mm łącznie między podwójnymi drzwiami. Dla płyty 18mm nachodzenie wynosi 16mm na boki i 15mm na poziome płyty skrajne. Wymiary i pozycje wyliczać wspólnie (parts/front_rules.py), podziały w kroku 0,1mm, z zachowaniem sumy wysokości. Przy AGD obowiązują wymagania modelu urządzenia. Zasada dotyczy frontów nakładanych; fronty wpuszczane mają osobne parametry. Zastępuje wcześniejsze przykłady 3mm luzu bocznego oraz 3mm między drzwiami podwójnymi.
 
 89. Połączenia i obróbkę generować automatycznie przy każdym wczytaniu YAML-a. Styki płyt rozpoznawać z geometrii, typ łącznika z polityki joinery. Nie uzupełniać ręcznie nawiertów pojedynczego projektu. Szablony okuć należą do bibliotek modeli. Nieustalone zachowanie omówić z użytkownikiem przed dodaniem reguły.
 90. Kolizja nawiertów jest błędem z nazwą płyty i współrzędnymi otworów. Nie przesuwać samodzielnie okuć ani połączeń w celu ukrycia kolizji. Ustalona wcześniej reguła półek naprzeciw siebie (konfirmat i przesunięty kołek) pozostaje jawną regułą konstrukcyjną. Walidacja obejmuje nawierty, nie pełne kolizje frezów i ruchu okuć.
@@ -218,3 +218,21 @@ mają pierwszeństwo. Reguła nie dotyczy płyt konstrukcyjnych ani podpór AGD.
 AXIS PRO: mocowanie dna do metalowych boków wykonuje się podczas montażu,
 przez otwory w okuciu (instrukcja GTV str. 9, krok 4). To jawna czynność
 montażowa w raporcie, nie brak szablonu CNC blokujący eksport.
+
+### Wspólna kontrola gotowego modelu
+
+Każdy generator kończy model wspólnym etapem `finalize_boards`: uzupełnia
+kołki między konfirmatami, normalizuje wymiary produkcyjne do 0,1 mm
+i sprawdza nawierty po zaokrągleniu. Reguła dodatkowych kołków obejmuje
+również szuflady, komody i biurka. Parametr
+`joinery.dowel_between_confirmats_above` ma domyślnie wartość 200 mm;
+dla biurka i kuchni znajduje się wewnątrz sekcji danego mebla, dla
+szuflady i komody na głównym poziomie YAML-a. Kołek powstaje w połowie
+odstępu na siatce 0,5 mm względem płyty; konfirmaty zachowują pozycje.
+
+Walidacja odrzuca otwory o nieprawidłowej głębokości/średnicy, wychodzące
+poza prostokątny obrys formatki i kolidujące z innymi nawiertami.
+Każdy writer produkcyjny CSV, dokumentacji wierceń i DXF ponownie sprawdza
+nawierty — także gdy model zmodyfikowano po wczytaniu. Braki szablonów
+nadal blokują eksport produkcyjny. Wykryte kolizje wymagają poprawy YAML-a;
+program nie przesuwa okuć ani łączników w celu ich ukrycia.

@@ -1,5 +1,8 @@
 # Desk wall with a drawer tower. All dimensions are millimetres.
 desk_drawer_wall:
+  joinery:
+    # Opposed shelves use the documented mixed joint policy.
+    mixed_shared_sides: true
   height: 2400             # derived from bridge.top + overhead.height
 
   desk:

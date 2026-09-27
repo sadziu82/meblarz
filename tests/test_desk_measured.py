@@ -92,6 +92,11 @@ def test_five_drawers_with_centred_through_handles(tmp_path, thickness):
     config['material']['drawer_thickness'] = thickness
     source = tmp_path / 'five.yaml'
     source.write_text(yaml.safe_dump(config))
+    if thickness == 20:
+        # This legacy runner pattern reaches the end of a 20 mm box side.
+        with pytest.raises(ValueError, match='bore crosses board edge for slide'):
+            load_desk_drawer_wall(str(source))
+        return
     model = load_desk_drawer_wall(str(source))
     fronts = [b for b in model.boards if b.name.startswith('tower_drawer_') and b.name.endswith('_front')]
     assert len(fronts) == 5

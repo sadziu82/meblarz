@@ -300,6 +300,7 @@ class TestCarcassJoints:
         expected_dir = '-z' if PLACEMENT == 'freestanding' else '+z'
         for jh in bd['carcass_top'].joint_holes:
             if jh.element == 1:
+                expected_dir = ('-z' if jh.hole_type == 'dowel' else '+z')
                 assert jh.direction == expected_dir, (
                     f"carcass_top el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
                 )
@@ -309,6 +310,7 @@ class TestCarcassJoints:
         expected_dir = '+z' if PLACEMENT == 'freestanding' else '-z'
         for jh in bd['carcass_bottom'].joint_holes:
             if jh.element == 1:
+                expected_dir = '+z' if jh.hole_type == 'dowel' else '-z'
                 assert jh.direction == expected_dir, (
                     f"carcass_bottom el=1: kierunek {jh.direction}, oczekiwano {expected_dir}"
                 )
@@ -318,7 +320,7 @@ class TestCarcassJoints:
         expected = 'confirmat' if PLACEMENT == 'builtin_both' else 'dowel'
         for board_name in ('carcass_top', 'carcass_bottom'):
             for jh in bd[board_name].joint_holes:
-                assert jh.hole_type == expected, (
+                assert jh.hole_type in ({'confirmat', 'dowel'} if expected == 'confirmat' else {'dowel'}), (
                     f"{board_name}→{jh.partner}: oczekiwano {expected}, jest {jh.hole_type}"
                 )
 
@@ -443,7 +445,8 @@ class TestDrawers:
             bottom = bd[f'drawer_{i}_bottom']
             for side in (f'drawer_{i}_side_left', f'drawer_{i}_side_right'):
                 holes = [jh for jh in bottom.joint_holes if jh.partner == side]
-                assert all(jh.hole_type == 'confirmat' for jh in holes)
+                assert sum(jh.hole_type == 'confirmat' for jh in holes) >= 2
+                assert all(jh.hole_type in ('confirmat', 'dowel') for jh in holes)
 
     def test_drawer_front_holes_only_from_back(self, bd):
         """Otwory frontu tylko od tylnej ściany +Y (reguła 44, 45)."""

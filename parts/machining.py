@@ -1,12 +1,16 @@
 """Validate bore locations and reject intersecting drilling envelopes."""
-from math import sqrt
+from math import sqrt, isfinite
 
 
 def _segments(board):
     sizes = (board.width, board.depth, board.height)
     for h in board.holes + board.joint_holes:
+        if h.direction not in ('+x', '-x', '+y', '-y', '+z', '-z'):
+            raise ValueError(f'{board.name}: invalid bore direction {h.direction}')
         axis = 'xyz'.index(h.direction[-1])
         p = [h.x, h.y, h.z]
+        if not all(isfinite(v) for v in (*p, *sizes, *board.pos)):
+            raise ValueError(f'{board.name}: non-finite bore geometry')
         for i in range(3):
             if not board.pos[i] - 1e-6 <= p[i] <= board.pos[i] + sizes[i] + 1e-6:
                 raise ValueError(f'{board.name}: hole outside board at {tuple(p)}')
@@ -25,8 +29,12 @@ def _segments(board):
             else:
                 steps = [(2.5, 35)]
         for radius, depth in steps:
-            if radius <= 0 or depth <= 0 or depth > sizes[axis] + 1e-6:
+            if not isfinite(radius) or not isfinite(depth) or radius <= 0 or depth <= 0 or depth > sizes[axis] + 1e-6:
                 raise ValueError(f'{board.name}: invalid bore depth/diameter for {label}')
+            for i in range(3):
+                if i != axis and (p[i] - radius < board.pos[i] - 1e-6 or
+                                  p[i] + radius > board.pos[i] + sizes[i] + 1e-6):
+                    raise ValueError(f'{board.name}: bore crosses board edge for {label} at {tuple(p)}')
             q = list(p)
             q[axis] += depth * (-1 if h.direction[0] == '+' else 1)
             yield h, label, p, q, radius
@@ -67,3 +75,14 @@ def validate_drilling(boards):
                     other_local = tuple(round(c[k] - board.pos[k], 2) for k in range(3))
                     raise ValueError(f'Kolizja nawiertów w {board.name}: {label} {local} '
                                      f'oraz {other_label} {other_local}. Popraw układ w YAML.')
+
+
+def finalize_boards(boards, config):
+    """Shared construction completion and validation of the production geometry."""
+    from parts.joinery import supplement_confirmat_dowels
+    from parts.materials import apply_finishes
+    settings = config.get('desk_drawer_wall', config.get('kitchen_tall_unit', config))
+    supplement_confirmat_dowels(boards, settings.get('joinery', {}))
+    apply_finishes(boards, config)
+    validate_drilling(boards)
+    return boards

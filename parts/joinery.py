@@ -35,9 +35,6 @@ def add_panel_joints(panels, config=None):
     hidden = config.get('hidden', 'confirmat')
     visible = config.get('visible', 'dowel')
     end_kind = config.get('end_panels', hidden)
-    dowel_gap = float(config.get('dowel_between_confirmats_above', 200))
-    if dowel_gap <= 0:
-        raise ValueError('dowel_between_confirmats_above must be positive')
     if any(kind not in ('confirmat', 'dowel') for kind in (hidden, visible, end_kind)):
         raise ValueError('Joinery types must be confirmat or dowel')
     panels = [b for b in panels if b.fabrication and not b.movable]
@@ -91,12 +88,8 @@ def add_panel_joints(panels, config=None):
             raise ValueError('Standard Ø8 dowels/confirmats require panels at least 12 mm thick')
         centre = edge.pos[c['short']] + es[c['short']] / 2
         positions = _positions(c['start'], c['end'], config, c['shift'])
-        fasteners = [(along, c['kind']) for along in positions]
-        if c['kind'] == 'confirmat':
-            ordered = sorted(positions)
-            fasteners += [(round(a + b) / 2, 'dowel')
-                          for a, b in zip(ordered, ordered[1:]) if b - a > dowel_gap]
-        for along, kind in sorted(fasteners):
+        for along in positions:
+            kind = c['kind']
             xyz = [0., 0., 0.]
             xyz[c['short']], xyz[c['long']] = centre, along
             xyz[axis] = c['outside'] if kind == 'confirmat' else c['contact']
@@ -107,6 +100,7 @@ def add_panel_joints(panels, config=None):
             direction = ('-' if c['normal'] == 1 else '+') + 'xyz'[axis]
             edge.joint_holes.append(JointHole(*xyz, direction, 2, face.name, kind))
         joints.append((face.name, edge.name))
+    supplement_confirmat_dowels(panels, config)
     return joints
 
 
@@ -187,3 +181,53 @@ def add_adjacent_cabinet_ties(boards, config=None):
             _add_side_pair_ties(left, right, config)
             joints.append((left.name, right.name))
     return joints
+
+
+def supplement_confirmat_dowels(boards, config=None):
+    """Complete existing joint pairs without moving any fastener or hardware bore."""
+    from collections import defaultdict
+    from math import isfinite
+    limit = float((config or {}).get('dowel_between_confirmats_above', 200))
+    if not isfinite(limit) or limit <= 0:
+        raise ValueError('dowel_between_confirmats_above must be positive and finite')
+    by_name = {b.name: b for b in boards}
+    for board in boards:
+        if not board.fabrication:
+            continue
+        groups = defaultdict(list)
+        for h in board.joint_holes:
+            if h.element == 1 and h.hole_type == 'confirmat':
+                groups[(h.partner, h.direction)].append(h)
+        for (partner_name, direction), holes in groups.items():
+            partner = by_name[partner_name]
+            normal = 'xyz'.index(direction[-1])
+            # A straight joint can run along either in-plane axis. Group by
+            # the other coordinate so parallel rows are never joined diagonally.
+            for axis in (i for i in range(3) if i != normal):
+                cross = next(i for i in range(3) if i not in (normal, axis))
+                rows = defaultdict(list)
+                for h in holes:
+                    rows[round((h.x, h.y, h.z)[cross], 6)].append(h)
+                for row in rows.values():
+                    row.sort(key=lambda h: (h.x, h.y, h.z)[axis])
+                    for a, b in zip(row, row[1:]):
+                        pa, pb = (a.x, a.y, a.z), (b.x, b.y, b.z)
+                        if pb[axis] - pa[axis] <= limit + 1e-6:
+                            continue
+                        point = list(pa)
+                        # Half-mm grid relative to the panel, independent of
+                        # model centring or translation in the preview.
+                        point[axis] = board.pos[axis] + round(
+                            ((pa[axis] + pb[axis]) / 2 - board.pos[axis]) * 2) / 2
+                        sizes = (board.width, board.depth, board.height)
+                        point[normal] = board.pos[normal] + (0 if direction[0] == '+' else sizes[normal])
+                        existing = [h for h in board.joint_holes
+                                    if h.partner == partner_name and h.element == 1
+                                    and h.hole_type == 'dowel'
+                                    and all(abs((h.x, h.y, h.z)[i] - point[i]) < 1e-6
+                                            for i in range(3))]
+                        if existing:
+                            continue
+                        inward_face = ('-' if direction[0] == '+' else '+') + direction[-1]
+                        board.joint_holes.append(JointHole(*point, inward_face, 1, partner_name, 'dowel'))
+                        partner.joint_holes.append(JointHole(*point, direction, 2, board.name, 'dowel'))

@@ -517,8 +517,8 @@ def load_drawer(path: str) -> DrawerModel:
                                        target_nl=target_nl,
                                        handle=cfg['front'].get('handle'),
                                        box_bottom_offset=carcass_t + 2 if cfg['front'].get('mount') == 'overlay' else 2)
-    from parts.materials import apply_finishes
-    boards = apply_finishes(_center_model(boards), cfg)
+    from parts.machining import finalize_boards
+    boards = finalize_boards(_center_model(boards), cfg)
 
     return DrawerModel(
         boards=boards,

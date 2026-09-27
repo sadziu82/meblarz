@@ -826,3 +826,22 @@ przed wydaniem wykonaj `venv/bin/python -m pytest -q`.
 Jeżeli publikacja zakończy się błędem po utworzeniu commita lub tagu,
 sprawdź stan Git i dokończ brakujący push ręcznie — ponowne `make release`
 może podnieść wersję ponownie.
+
+## Walidacja połączeń i nawiertów
+
+Wszystkie generatory sprawdzają finalne nawierty po zaokrągleniu do 0,1 mm.
+Eksport ponawia kontrolę: odrzuca nieprawidłowe głębokości/średnice, wyjście
+poza prostokątny obrys płyty i kolizje otworów. Błąd wskazuje płytę; należy
+poprawić projekt, zamiast przesuwać otwory automatycznie.
+
+Kołki uzupełniają konfirmaty również w szufladach, komodach i biurkach:
+
+```yaml
+joinery:
+  dowel_between_confirmats_above: 200 # dodatkowy kołek tylko przy odstępie > 200 mm
+```
+
+W projektach `desk_drawer_wall` i `kitchen_tall_unit` sekcja `joinery` znajduje
+się wewnątrz sekcji mebla. Pozostałe generatory czytają ją z poziomu głównego.
+Na wspólnej przegrodzie biurka półki po przeciwnych stronach wymagają
+uzgodnionej polityki `joinery.mixed_shared_sides: true`.

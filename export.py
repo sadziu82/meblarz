@@ -35,6 +35,8 @@ class IncompleteMachiningError(ValueError):
 
 
 def _require_complete_machining(model: DrawerModel) -> None:
+    from parts.machining import validate_drilling
+    validate_drilling(model.boards)
     if model.machining_issues:
         details = '\n'.join(f'- {issue["reason"]} Elementy: {", ".join(issue["boards"])}'
                             for issue in model.machining_issues)

@@ -498,8 +498,8 @@ def load_dresser(path: str) -> DrawerModel:
     # ─ Centre model ───────────────────────────────────────────────────────────
     all_boards = _center_model(all_boards)
 
-    from parts.materials import apply_finishes
-    apply_finishes(all_boards, cfg)
+    from parts.machining import finalize_boards
+    finalize_boards(all_boards, cfg)
     return DrawerModel(
         boards=all_boards,
         max_travel=float(slide_cfg.get('travel_mm', nl_used)),

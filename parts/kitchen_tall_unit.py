@@ -11,7 +11,6 @@ from parts.front_rules import SIDE_REVEAL, END_REVEAL, VERTICAL_GAP, DOUBLE_DOOR
 from parts.axis_pro import axis_spec, add_axis_drawer
 from parts.kitchen_hardware import add_side_hinges, add_lift_hinges, add_handles, hinge_spec
 from parts.joinery import add_panel_joints, add_adjacent_cabinet_ties
-from parts.machining import validate_drilling
 from parts.manual_cutout import add_side_cutout_guide
 from parts.kitchen_ventilation import add_plinth_opening, add_rear_notch, add_upper_back
 
@@ -504,7 +503,6 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
     joints += add_panel_joints(plinth_boards, {**joinery, 'visible': 'dowel'})
     joints += add_adjacent_cabinet_ties(boards, joinery.get('column_ties'))
     add_handles(boards, cfg.get('handles'))
-    validate_drilling(boards)
     notes = [
         'Eight Emuca Bone 2024417 adjustable kitchen legs, four per carcass. Plate fixing centres 64 × 64 mm from the Emuca catalogue p.727; underside pilot Ø2.5 × 12 mm is a project choice for Ø4 wood screws in 18 mm board. Mounting plate preview is simplified.',
         'Samsung BRB38G705DWWEF: recommended niche 714 × 1940 × 580 mm (allowed width 712–720 and height 1938–1942). Sliding connectors couple the independently hinged furniture and appliance doors. Furniture panels have their own cup hinges; confirm their clearance against the actual appliance. The 18 mm panels are permitted; maximum panel mass is 23 kg for the refrigerator door and 15.5 kg for the freezer door.',
@@ -529,8 +527,8 @@ def load_kitchen_tall_unit(path: str) -> DrawerModel:
         issues.append(dict(operation='plinth_clip_mount',
                            boards=[b.name for b in plinth_boards],
                            reason='Klipsy cokołu Emuca Bone wymagają ustalenia sposobu zamocowania do płyt cokołu.'))
-    from parts.materials import apply_finishes
-    apply_finishes(boards, {**root, 'material': material})
+    from parts.machining import finalize_boards
+    finalize_boards(boards, {**root, 'material': material})
     return DrawerModel(boards=_center_model(boards), gas_lifts=gas_lifts, max_travel=nl,
                        slide_model='GTV Axis Pro', slide_nl=int(nl), drawer_count=3,
                        joints=joints, notes=notes, machining_issues=issues,

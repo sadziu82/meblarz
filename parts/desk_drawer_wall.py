@@ -690,8 +690,8 @@ def load_desk_drawer_wall(path: str) -> DrawerModel:
                 f"udźwig katalogowy {keyboard_slide['load_capacity_kg']} kg nie potwierdza tej szerokości.",
                 'Karta prowadnic: ' + keyboard_slide['source'],
             ])
-    from parts.materials import apply_finishes
-    apply_finishes(boards, root)
+    from parts.machining import finalize_boards
+    finalize_boards(boards, root)
     return DrawerModel(boards=_center_model(boards), max_travel=float(slide_cfg.get('travel_mm', nl_used)),
                        slide_model=drawers['slides']['model'], slide_nl=nl_used,
                        joints=joints, drawer_count=drawer_count, notes=notes)

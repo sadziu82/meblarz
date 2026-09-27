@@ -205,3 +205,17 @@
 AXIS PRO: fasten the bottom through the metal-side holes during assembly
 (GTV instructions p.9, step 4). List this agreed assembly operation in the
 report; it is not an unresolved CNC template blocking production export.
+
+### Shared final-model validation
+
+Every generator runs `finalize_boards`: add intermediate confirmat dowels,
+normalize production dimensions to 0.1 mm and validate the resulting bores.
+This includes drawers, dressers and desks. The default
+`joinery.dowel_between_confirmats_above` is 200 mm; put it inside the furniture
+section for desks/kitchens and at YAML root for drawers/dressers. Dowels
+use the panel-local 0.5 mm grid; existing screws are not moved.
+
+Validation rejects invalid bore dimensions, cylinders crossing the rectangular
+panel boundary and conflicting bores. All production writers revalidate even
+models modified after loading. Missing machining templates still block production
+export. Resolve collisions in YAML; do not silently relocate hardware or joints.
