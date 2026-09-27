@@ -2,6 +2,12 @@
 
 Parametric furniture design and 3D visualisation tool.
 
+> **Work in progress — not ready for production.** Generated dimensions, drilling
+> positions and machining instructions may be incorrect or incomplete. Do not rely
+> on them for ordering, cutting or drilling furniture parts. Independently verify
+> every dimension and operation against the intended construction and hardware
+> installation instructions before manufacturing.
+
 Design rules: [Polish (authoritative)](docs/reguly_projektowania.md),
 [English](docs/design_rules.md). The current desk project uses 18 mm laminated
 furniture board (EGGER H1318 ST10), HDF 3 mm backs and HDF 3 mm drawer bottoms.
